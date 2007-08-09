@@ -187,6 +187,9 @@ static int redir_data(struct redir *r)
 	r->connected = 1;
 	return 0;
     case SOL_HEARTBEAT:
+    case SOL_KEEP_ALIVE_PING:
+    case IDER_HEARTBEAT:
+    case IDER_KEEP_ALIVE_PING:
 	if (rc != HEARTBEAT_LENGTH) {
 	    fprintf(stderr,"HEARTBEAT: got %d, expected %d bytes\n",
 		    rc, HEARTBEAT_LENGTH);
@@ -396,8 +399,10 @@ int main(int argc, char *argv[])
     ai.ai_family = PF_UNSPEC;
     tcp_verbose = r.verbose;
     r.sock = tcp_connect(&ai, NULL, NULL, host, port);
-    if (-1 == r.sock)
+    if (-1 == r.sock) {
+	tty_restore();
 	exit(1);
+    }
 
     tty_raw();
     redir_start(&r);
