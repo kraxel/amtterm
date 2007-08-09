@@ -6,6 +6,7 @@ bindir	?= $(prefix)/bin
 CC	?= gcc
 CFLAGS	?= -Os -g
 CFLAGS	+= -Wall -Wno-pointer-sign
+CFLAGS	+= -DVERSION='"$(shell cat VERSION)"'
 
 TARGETS	:= amtterm
 

@@ -311,7 +311,8 @@ static void usage(FILE *fp)
 {
     fprintf(fp,
             "\n"
-            "Establish serial-over-lan connection to Intel AMT boxes.\n"
+	    "This is " APPNAME ", release " VERSION ", I'll establish\n"
+	    "serial-over-lan (sol) connections to your Intel AMT boxes.\n"
             "\n"
             "usage: " APPNAME " [options] host [port]\n"
             "options:\n"
