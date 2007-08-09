@@ -40,11 +40,14 @@ Very short HowTo:
 Testing AMT
 -----------
 
-Take your browser, point it to http://machine:16992/.  You must do
-that from a remote host as the NIC intercepts network packets for AMT,
-thus it doesn't work from the local machine as the packets never pass
-the NIC then.  If everything is fine you'll see a greeting page with a
-button for login.
+Take your browser, point it to http://machine:16992/.  If you
+configured AMT to use DHCP (which is the default) the OS and the
+management stack share the same IP address.
+
+You must do that from a remote host as the NIC intercepts network
+packets for AMT, thus it doesn't work from the local machine as the
+packets never pass the NIC then.  If everything is fine you'll see a
+greeting page with a button for login.
 
 You can login now, using "admin" as username and the password
 configured during setup.  You'll see some pages with informations
@@ -88,7 +91,7 @@ see the boot messages (and kernel Oopses, if any).
 
 You can tell grub to use that serial device, so you can pick a working
 kernel for the next boot.  Usual commands from the grub manual, except
-that you need "--port=0xe000"instead of "--unit=0" due to the
+that you need "--port=0xe000" instead of "--unit=0" due to the
 non-standard I/O port for the serial line (my machine, yours might use
 another port, check linux kernel boot messages).
 
@@ -96,6 +99,20 @@ The magic command for the Xen kernel is "com1=115200,8n1,0xe000,0"
 (again, you might have to replace the I/O port).  The final '0'
 disables the IRQ, otherwise the Xen kernel hangs at boot after
 enabling interrupts.
+
+
+Fun with Xen and AMT
+--------------------
+
+The AMT network stack seems to become slightly confused when running
+on a Xen host in DHCP mode.  Everything works fine as long as only
+Dom0 runs.  But if one starts a guest OS (with bridged networking) AMT
+suddenly changes the IP address to the one the guest aquired via DHCP.
+
+It is probably a good idea to assign a separate static IP address to
+AMT then.  I didn't manage to switch my machine from DHCP to static IP
+yet though, the BIOS refuses to accept the settings.  The error
+message doesn't indicate why.
 
 
 More fun with AMT
