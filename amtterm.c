@@ -358,6 +358,7 @@ int main(int argc, char *argv[])
 	    break;
 	case 'p':
 	    snprintf(r.pass, sizeof(r.pass), "%s", optarg);
+	    memset(optarg,'*',strlen(optarg)); /* rm passwd from ps list */
 	    break;
 
         case 'h':
