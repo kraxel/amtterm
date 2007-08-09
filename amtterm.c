@@ -384,11 +384,11 @@ int main(int argc, char *argv[])
 	tty_noecho();
 	fprintf(stderr, "AMT password for host %s: ", host);
 	fgets(r.pass, sizeof(r.pass), stdin);
+	fprintf(stderr, "\n");
 	if (NULL != (h = strchr(r.pass, '\r')))
 	    *h = 0;
 	if (NULL != (h = strchr(r.pass, '\n')))
 	    *h = 0;
-	fprintf(stderr, "\n");
     }
 
     memset(&ai, 0, sizeof(ai));

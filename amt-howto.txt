@@ -1,2 +1,116 @@
-http://www.intel.com/technology/platform-technology/intel-amt/engage.htm
-Intel AMT Technology Deployment and Reference Guide
+Intel AMT with linux mini HowTo
+===============================
+
+
+What is AMT and why I should care?
+----------------------------------
+
+AMT stands for "Active Management Technology".  It provides some
+remote management facilities.  They are handled by the hardware and
+firmware, thus they work independant from the operation system.
+Means: It works before Linux bootet up to the point where it activated
+the network interface.  It works even when your most recent test
+kernel deadlocked the machine.  Which makes it quite useful for
+development machines ...
+
+
+Enabling AMT
+------------
+
+Look here for verbose documentation:
+  http://www.intel.com/technology/platform-technology/intel-amt/engage.htm
+Most useful to get started:
+  "Intel AMT Deployment and Reference Guide"
+
+Very short HowTo:
+  * Enter BIOS Setup.
+    - Enable AMT
+  * Enter ME (Management Extention) Setup.  Ctrl-P hotkey works for me.
+    - Login, factory default password is "admin".
+    - Change password.  Trivial ones don't work, must include upper-
+      and lowercase letters, digits, special characters.
+    - Enable AMT Managment.
+  * Reboot, Enter ME Setup again with AMT enabled.
+    - Configure AMT (hostname, network config, ...)
+    - Use SMB (Small Business) management mode.  The other one
+      (Enterprise) requires Active Directory Service Infrastructure,
+      you don't want that, at least not for your first steps ...
+
+
+Testing AMT
+-----------
+
+Take your browser, point it to http://machine:16992/.  You must do
+that from a remote host as the NIC intercepts network packets for AMT,
+thus it doesn't work from the local machine as the packets never pass
+the NIC then.  If everything is fine you'll see a greeting page with a
+button for login.
+
+You can login now, using "admin" as username and the password
+configured during setup.  You'll see some pages with informations
+about the machine.  You can also change AMT settings here.
+
+
+Control Machine
+---------------
+
+You might have noticed already while browing the pages: There is a
+"Remote Control" page.  You can remotely reset and powercycle the
+machine there, thus recover the machine after booting a b0rken kernel,
+without having someone walk over to the machine and hit the reset
+button.
+
+
+Serial-over-LAN (SOL) console
+-----------------------------
+
+AMT also provides a virtual serial port which can be accessed via
+network.  That gives you a serial console without a serial cable to
+another machine.
+
+If you have activated AMT and SOL the linux kernel should see an
+additional serial port, like this on my machine:
+
+  [root@xeni ~]# dmesg | grep ttyS2
+  0000:00:03.3: ttyS2 at I/O 0xe000 (irq = 169) is a 16550A
+
+Edit initab, add a line like this:
+
+  S2:2345:respawn:/sbin/agetty ttyS2 115200 vt100-nav
+
+You should add the serial port to /etc/securetty too so you are able
+to login as root.  Reload inittab ("init q").  Use amtterm to connect.
+Tap enter.  You should see a login prompt now and be able to login.
+
+You can also use that device as console for the linux kernel, using
+the usual "console=ttyS0,115200" kernel command line argument, so you
+see the boot messages (and kernel Oopses, if any).
+
+You can tell grub to use that serial device, so you can pick a working
+kernel for the next boot.  Usual commands from the grub manual, except
+that you need "--port=0xe000"instead of "--unit=0" due to the
+non-standard I/O port for the serial line (my machine, yours might use
+another port, check linux kernel boot messages).
+
+The magic command for the Xen kernel is "com1=115200,8n1,0xe000,0"
+(again, you might have to replace the I/O port).  The final '0'
+disables the IRQ, otherwise the Xen kernel hangs at boot after
+enabling interrupts.
+
+
+More fun with AMT
+-----------------
+
+You might want to download the DTK (Developer Toolkit, source code is
+available too) and play with it.  The .exe is a self-extracting rar
+archive and can be unpacked on linux using the unrar utility.  The
+Switchbox comes with a linux binary (additionally to the Windows
+stuff).  The GUI tools are written in C#.  Trying to make them fly
+with mono didn't work for me though (mono version 1.2.3 as shipped
+with Fedora 7).
+
+enjoy,
+  Gerd
+
+--
+Gerd Hoffmann <kraxel@redhat.com>
