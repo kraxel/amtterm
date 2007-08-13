@@ -8,7 +8,6 @@
 #include <signal.h>
 #include <sys/ioctl.h>
 
-#include "tcp.h"
 #include "redir.h"
 
 #define APPNAME "amtterm"
@@ -30,10 +29,11 @@ static void state_tty(void *cb_data, enum redir_state old, enum redir_state new)
     if (!r->verbose)
 	return;
 
-    fprintf(stderr, APPNAME " state: %s -> %s\n",
-	    redir_strstate(old), redir_strstate(new));
+    fprintf(stderr, APPNAME ": %s -> %s (%s)\n",
+	    redir_state_name(old), redir_state_name(new),
+	    redir_state_desc(new));
     switch (new) {
-    case REDIR_CONN_SOL:
+    case REDIR_RUN_SOL:
 	fprintf(stderr, "serial-over-lan redirection ok\n");
 	fprintf(stderr, "connected now, use ^] to escape\n");
 	break;
@@ -55,7 +55,7 @@ static int redir_loop(struct redir *r)
 	    break;
 
 	FD_ZERO(&set);
-	if (r->state == REDIR_CONN_SOL)
+	if (r->state == REDIR_RUN_SOL)
 	    FD_SET(0,&set);
 	FD_SET(r->sock,&set);
 	tv.tv_sec  = HEARTBEAT_INTERVAL * 4 / 1000;
@@ -164,10 +164,7 @@ static void usage(FILE *fp)
 
 int main(int argc, char *argv[])
 {
-    struct addrinfo ai;
     struct redir r;
-    char *port = "16994";
-    char *host = NULL;
     char *h;
     int c;
 
@@ -211,10 +208,10 @@ int main(int argc, char *argv[])
     }
 
     if (optind < argc)
-	host = argv[optind];
+	snprintf(r.host, sizeof(r.host), "%s", argv[optind]);
     if (optind+1 < argc)
-	port = argv[optind+1];
-    if (NULL == host) {
+	snprintf(r.port, sizeof(r.port), "%s", argv[optind+1]);
+    if (0 == strlen(r.host)) {
 	usage(stderr);
 	exit(1);
     }
@@ -222,7 +219,7 @@ int main(int argc, char *argv[])
     tty_save();
     if (0 == strlen(r.pass)) {
 	tty_noecho();
-	fprintf(stderr, "AMT password for host %s: ", host);
+	fprintf(stderr, "AMT password for host %s: ", r.host);
 	fgets(r.pass, sizeof(r.pass), stdin);
 	fprintf(stderr, "\n");
 	if (NULL != (h = strchr(r.pass, '\r')))
@@ -231,12 +228,7 @@ int main(int argc, char *argv[])
 	    *h = 0;
     }
 
-    memset(&ai, 0, sizeof(ai));
-    ai.ai_socktype = SOCK_STREAM;
-    ai.ai_family = PF_UNSPEC;
-    tcp_verbose = r.verbose;
-    r.sock = tcp_connect(&ai, NULL, NULL, host, port);
-    if (-1 == r.sock) {
+    if (-1 == redir_connect(&r)) {
 	tty_restore();
 	exit(1);
     }

@@ -2,20 +2,23 @@
 
 enum redir_state {
     REDIR_NONE      =  0,
-    REDIR_INIT      =  1,
-    REDIR_AUTH      =  2,
+    REDIR_CONNECT   =  1,
+    REDIR_INIT      =  2,
+    REDIR_AUTH      =  3,
     REDIR_INIT_SOL  = 10,
-    REDIR_CONN_SOL  = 11,
+    REDIR_RUN_SOL   = 11,
     REDIR_INIT_IDER = 20,
-    REDIR_CONN_IDER = 21,
+    REDIR_RUN_IDER  = 21,
     REDIR_CLOSING   = 30,
     REDIR_CLOSED    = 31,
-    REDIR_ERROR     = 99,
+    REDIR_ERROR     = 40,
 };
 
 struct redir {
     int               sock;
     int               verbose;
+    unsigned char     host[64];
+    unsigned char     port[16];
     unsigned char     type[4];
     unsigned char     user[16];
     unsigned char     pass[16];
@@ -27,8 +30,10 @@ struct redir {
     int (*cb_recv)(void *cb_data, unsigned char *buf, int len);
 };
 
-const char *redir_strstate(enum redir_state state);
+const char *redir_state_name(enum redir_state state);
+const char *redir_state_desc(enum redir_state state);
 
+int redir_connect(struct redir *r);
 int redir_start(struct redir *r);
 int redir_stop(struct redir *r);
 int redir_auth(struct redir *r);

@@ -10,6 +10,8 @@
 #include <gtk/gtk.h>
 #include <vte/vte.h>
 
+#include "redir.h"
+
 struct gamt_window {
     /* gtk stuff */
     GtkActionGroup *ag;
@@ -17,6 +19,11 @@ struct gamt_window {
     GtkWidget      *win;
     GtkWidget      *vte;
     GtkWidget      *status;
+
+    /* sol stuff */
+    struct redir   redir;
+    GIOChannel     *ch;
+    guint          id;
 };
 
 /* ------------------------------------------------------------------ */
@@ -34,6 +41,41 @@ static void destroy_cb(GtkWidget *widget, gpointer data)
 
     gtk_main_quit();
     free(gamt);
+}
+
+/* ------------------------------------------------------------------ */
+
+static int recv_gtk(void *cb_data, unsigned char *buf, int len)
+{
+    struct gamt_window *gamt = cb_data;
+    vte_terminal_feed(VTE_TERMINAL(gamt->vte), buf, len);
+    return 0;
+}
+
+static void state_gtk(void *cb_data, enum redir_state old, enum redir_state new)
+{
+    struct gamt_window *gamt = cb_data;
+    unsigned char buf[128];
+
+    switch (new) {
+    case REDIR_ERROR:
+	snprintf(buf, sizeof(buf), "%s: %s FAILED", gamt->redir.host,
+		 redir_state_desc(old));
+	break;
+    default:
+	snprintf(buf, sizeof(buf), "%s: %s", gamt->redir.host,
+		 redir_state_desc(new));
+	break;
+    }
+    gtk_label_set_text(GTK_LABEL(gamt->status), buf);
+}
+
+static void user_input(VteTerminal *vte, gchar *buf, guint len,
+		       gpointer data)
+{
+    struct gamt_window *gamt = data;
+
+    redir_sol_send(&gamt->redir, buf, len);
 }
 
 /* ------------------------------------------------------------------ */
@@ -65,6 +107,51 @@ static char ui_xml[] =
 "</ui>";
 
 /* ------------------------------------------------------------------ */
+
+static gboolean gamt_data(GIOChannel *source, GIOCondition condition,
+			  gpointer data)
+{
+    struct gamt_window *gamt = data;
+
+    redir_data(&gamt->redir);
+
+    if (gamt->redir.state == REDIR_CLOSED ||
+	gamt->redir.state == REDIR_ERROR) {
+	g_source_destroy(g_main_context_find_source_by_id
+                         (g_main_context_default(), gamt->id));
+	gamt->id = 0;
+	gamt->ch = NULL;
+    }
+    return TRUE;
+}
+
+static int gamt_connect(struct gamt_window *gamt, char *host, char *port)
+{
+    char *h;
+    
+    memset(&gamt->redir, 0, sizeof(gamt->redir));
+    memcpy(&gamt->redir.type, "SOL ", 4);
+    strcpy(gamt->redir.user, "admin");
+    if (NULL != (h = getenv("AMT_PASSWORD")))
+	snprintf(gamt->redir.pass, sizeof(gamt->redir.pass), "%s", h);
+
+    snprintf(gamt->redir.host, sizeof(gamt->redir.host), "%s", host);
+    if (port)
+	snprintf(gamt->redir.port, sizeof(gamt->redir.port), "%s", port);
+
+    gamt->redir.verbose  = 1;
+    gamt->redir.cb_data  = gamt;
+    gamt->redir.cb_recv  = recv_gtk;
+    gamt->redir.cb_state = state_gtk;
+
+    if (-1 == redir_connect(&gamt->redir))
+	return -1;
+
+    gamt->ch = g_io_channel_unix_new(gamt->redir.sock);
+    gamt->id = g_io_add_watch(gamt->ch, G_IO_IN, gamt_data, gamt);
+    redir_start(&gamt->redir);
+    return 0;
+}
 
 static struct gamt_window *gamt_window()
 {
@@ -100,9 +187,11 @@ static struct gamt_window *gamt_window()
 
     /* vte terminal */
     gamt->vte = vte_terminal_new();
+    g_signal_connect(gamt->vte, "commit", G_CALLBACK(user_input), gamt);
+
 
     /* other widgets */
-    gamt->status = gtk_label_new("status line");
+    gamt->status = gtk_label_new("idle");
     gtk_misc_set_alignment(GTK_MISC(gamt->status), 0, 0.5);
     gtk_misc_set_padding(GTK_MISC(gamt->status), 3, 1);
 
@@ -141,6 +230,7 @@ static void usage(FILE *fp)
 int
 main(int argc, char *argv[])
 {
+    struct gamt_window *gamt;
     int debug = 0;
     int c;
 
@@ -161,15 +251,12 @@ main(int argc, char *argv[])
         }
     }
 
-#if 0
-    if (optind+1 > argc) {
-	usage(stderr);
+    gamt = gamt_window();
+    if (NULL == gamt)
 	exit(1);
-    }
-#endif
 
-    if (NULL == gamt_window())
-	exit(1);
+    if (optind+1 <= argc)
+	gamt_connect(gamt, argv[optind], NULL);
 
     gtk_main();
     exit(0);

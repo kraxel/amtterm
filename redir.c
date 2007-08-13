@@ -3,19 +3,35 @@
 #include <unistd.h>
 #include <string.h>
 
+#include "tcp.h"
 #include "redir.h"
 
-static const char *state_names[] = {
+static const char *state_name[] = {
     [ REDIR_NONE      ] = "NONE",
+    [ REDIR_CONNECT   ] = "CONNECT",
     [ REDIR_INIT      ] = "INIT",
     [ REDIR_AUTH      ] = "AUTH",
     [ REDIR_INIT_SOL  ] = "INIT_SOL",
-    [ REDIR_CONN_SOL  ] = "CONN_SOL",
+    [ REDIR_RUN_SOL   ] = "RUN_SOL",
     [ REDIR_INIT_IDER ] = "INIT_IDER",
-    [ REDIR_CONN_IDER ] = "CONN_IDER",
+    [ REDIR_RUN_IDER  ] = "RUN_IDER",
     [ REDIR_CLOSING   ] = "CLOSING",
     [ REDIR_CLOSED    ] = "CLOSED",
     [ REDIR_ERROR     ] = "ERROR",
+};
+
+static const char *state_desc[] = {
+    [ REDIR_NONE      ] = "disconnected",
+    [ REDIR_CONNECT   ] = "connection to host",
+    [ REDIR_INIT      ] = "redirection initialization",
+    [ REDIR_AUTH      ] = "session authentication",
+    [ REDIR_INIT_SOL  ] = "serial-over-lan initialization",
+    [ REDIR_RUN_SOL   ] = "serial-over-lan active",
+    [ REDIR_INIT_IDER ] = "IDE redirect initialization",
+    [ REDIR_RUN_IDER  ] = "IDE redirect active",
+    [ REDIR_CLOSING   ] = "redirection shutdown",
+    [ REDIR_CLOSED    ] = "connection closed",
+    [ REDIR_ERROR     ] = "failure",
 };
 
 /* ------------------------------------------------------------------ */
@@ -31,15 +47,45 @@ static void redir_state(struct redir *r, enum redir_state new)
 
 /* ------------------------------------------------------------------ */
 
-const char *redir_strstate(enum redir_state state)
+const char *redir_state_name(enum redir_state state)
 {
     const char *name = NULL;
 
-    if (state < sizeof(state_names)/sizeof(state_names[0]))
-	name = state_names[state];
+    if (state < sizeof(state_name)/sizeof(state_name[0]))
+	name = state_name[state];
     if (NULL == name)
 	name = "unknown";
     return name;
+}
+
+const char *redir_state_desc(enum redir_state state)
+{
+    const char *desc = NULL;
+
+    if (state < sizeof(state_desc)/sizeof(state_desc[0]))
+	desc = state_desc[state];
+    if (NULL == desc)
+	desc = "unknown";
+    return desc;
+}
+
+int redir_connect(struct redir *r)
+{
+    static unsigned char *defport = "16994";
+    struct addrinfo ai;
+
+    memset(&ai, 0, sizeof(ai));
+    ai.ai_socktype = SOCK_STREAM;
+    ai.ai_family = PF_UNSPEC;
+    tcp_verbose = r->verbose;
+    redir_state(r, REDIR_CONNECT);
+    r->sock = tcp_connect(&ai, NULL, NULL, r->host,
+			  strlen(r->port) ? r->port : defport);
+    if (-1 == r->sock) {
+	redir_state(r, REDIR_ERROR);
+	return -1;
+    }
+    return 0;
 }
 
 int redir_start(struct redir *r)
@@ -60,7 +106,9 @@ int redir_stop(struct redir *r)
     };
 
     redir_state(r, REDIR_CLOSED);
-    return write(r->sock, request, sizeof(request));
+    write(r->sock, request, sizeof(request));
+    close(r->sock);
+    return 0;
 }
 
 int redir_auth(struct redir *r)
@@ -172,8 +220,9 @@ int redir_data(struct redir *r)
     int rc;
 
     rc = read(r->sock, request, sizeof(request));
-    if (rc < 4)
+    if (rc != 4)
 	goto err;
+
     switch (request[0]) {
     case START_REDIRECTION_SESSION_REPLY:
 	if (rc != START_REDIRECTION_SESSION_REPLY_LENGTH) {
@@ -197,13 +246,13 @@ int redir_data(struct redir *r)
 	    fprintf(stderr, "serial-over-lan redirection failed\n");
 	    goto err;
 	}
-	redir_state(r, REDIR_CONN_SOL);
+	redir_state(r, REDIR_RUN_SOL);
 	return 0;
     case SOL_HEARTBEAT:
     case SOL_KEEP_ALIVE_PING:
     case IDER_HEARTBEAT:
     case IDER_KEEP_ALIVE_PING:
-	if (rc != HEARTBEAT_LENGTH) {
+	if (rc < HEARTBEAT_LENGTH) {
 	    fprintf(stderr,"HEARTBEAT: got %d, expected %d bytes\n",
 		    rc, HEARTBEAT_LENGTH);
 	    goto err;
