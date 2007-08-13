@@ -8,209 +8,38 @@
 #include <signal.h>
 #include <sys/ioctl.h>
 
-#include "RedirectionConstants.h"
 #include "tcp.h"
+#include "redir.h"
 
 #define APPNAME "amtterm"
 #define BUFSIZE 512
 
-struct redir {
-    int sock;
-    int connected;
-    int verbose;
-    int closed;
-    unsigned char type[4];
-    unsigned char user[16];
-    unsigned char pass[16];
-};
-
 /* ------------------------------------------------------------------ */
 
-static int redir_start(struct redir *r)
+static int recv_tty(void *cb_data, unsigned char *buf, int len)
 {
-    unsigned char request[START_REDIRECTION_SESSION_LENGTH] = {
-	START_REDIRECTION_SESSION, 0, 0, 0,  0, 0, 0, 0
-    };
+//    struct redir *r = cb_data;
 
-    memcpy(request+4, r->type, 4);
-    return write(r->sock, request, sizeof(request));
+    return write(0, buf, len);
 }
 
-static int redir_stop(struct redir *r)
+static void state_tty(void *cb_data, enum redir_state old, enum redir_state new)
 {
-    unsigned char request[END_REDIRECTION_SESSION_LENGTH] = {
-	END_REDIRECTION_SESSION, 0, 0, 0
-    };
+    struct redir *r = cb_data;
 
-    return write(r->sock, request, sizeof(request));
-}
+    if (!r->verbose)
+	return;
 
-static int redir_auth(struct redir *r)
-{
-    int ulen = strlen(r->user);
-    int plen = strlen(r->pass);
-    int len = 11+ulen+plen;
-    int rc;
-    unsigned char *request = malloc(len);
-
-    memset(request, 0, len);
-    request[0] = AUTHENTICATE_SESSION;
-    request[4] = 0x01;
-    request[5] = ulen+plen+2;
-    request[9] = ulen;
-    memcpy(request + 10, r->user, ulen);
-    request[10 + ulen] = plen;
-    memcpy(request + 11 + ulen, r->pass, plen);
-    rc = write(r->sock, request, len);
-    free(request);
-    return rc;
-}
-
-static int redir_sol_start(struct redir *r)
-{
-    unsigned char request[START_SOL_REDIRECTION_LENGTH] = {
-	START_SOL_REDIRECTION, 0, 0, 0,
-	0, 0, 0, 0,
-	MAX_TRANSMIT_BUFFER & 0xff,
-	MAX_TRANSMIT_BUFFER >> 8,
-	TRANSMIT_BUFFER_TIMEOUT & 0xff,
-	TRANSMIT_BUFFER_TIMEOUT >> 8,
-	TRANSMIT_OVERFLOW_TIMEOUT & 0xff,	TRANSMIT_OVERFLOW_TIMEOUT >> 8,
-	HOST_SESSION_RX_TIMEOUT & 0xff,
-	HOST_SESSION_RX_TIMEOUT >> 8,
-	HOST_FIFO_RX_FLUSH_TIMEOUT & 0xff,
-	HOST_FIFO_RX_FLUSH_TIMEOUT >> 8,
-	HEARTBEAT_INTERVAL & 0xff,
-	HEARTBEAT_INTERVAL >> 8,
-	0, 0, 0, 0
-    };
-
-    return write(r->sock, request, sizeof(request));
-}
-
-static int redir_sol_stop(struct redir *r)
-{
-    unsigned char request[END_SOL_REDIRECTION_LENGTH] = {
-	END_SOL_REDIRECTION, 0, 0, 0,
-	0, 0, 0, 0,
-    };
-
-    return write(r->sock, request, sizeof(request));
-}
-
-static int redir_sol_send(struct redir *r, unsigned char *buf, int blen)
-{
-    int len = 10+blen;
-    int rc;
-    unsigned char *request = malloc(len);
-
-    memset(request, 0, len);
-    request[0] = SOL_DATA_TO_HOST;
-    request[8] = blen & 0xff;
-    request[9] = blen >> 8;
-    memcpy(request + 10, buf, blen);
-    rc = write(r->sock, request, len);
-    free(request);
-    return rc;
-}
-
-static int redir_sol_recv(struct redir *r, unsigned char *buf, int blen)
-{
-    unsigned char msg[64];
-    int count, len;
-
-    len = buf[8] + (buf[9] << 8);
-    count = blen - 10;
-    write(0, buf + 10, count);
-    len -= count;
-    while (len) {
-	count = sizeof(msg);
-	if (count > len)
-	    count = len;
-	count = read(r->sock, msg, count);
-	switch (count) {
-	case -1:
-	    perror("read(sock)");
-	    return -1;
-	case 0:
-	    fprintf(stderr, "EOF from socket\n");
-	    return -1;
-	default:
-	    write(0, msg, count);
-	    len -= count;
-	}
-    }
-    return 0;
-}
-
-/* ------------------------------------------------------------------ */
-
-static int redir_data(struct redir *r)
-{
-    unsigned char request[64];
-    int rc;
-
-    rc = read(r->sock, request, sizeof(request));
-    if (rc < 4)
-	return -1;
-    switch (request[0]) {
-    case START_REDIRECTION_SESSION_REPLY:
-	if (rc != START_REDIRECTION_SESSION_REPLY_LENGTH) {
-	    fprintf(stderr,"START_REDIRECTION_SESSION_REPLY: got %d, expected %d bytes\n",
-		    rc, START_REDIRECTION_SESSION_REPLY_LENGTH);
-	    return -1;
-	}
-	if (request[1] != STATUS_SUCCESS) {
-	    fprintf(stderr, "redirection session start failed\n");
-	    return -1;
-	}
-	if (r->verbose)
-	    fprintf(stderr, "redirection session start ok\n");
-	return redir_auth(r);
-    case AUTHENTICATE_SESSION_REPLY:
-	if (request[1] != STATUS_SUCCESS) {
-	    fprintf(stderr, "session authentication failed\n");
-	    return -1;
-	}
-	if (r->verbose)
-	    fprintf(stderr, "session authentication ok\n");
-	return redir_sol_start(r);
-    case START_SOL_REDIRECTION_REPLY:
-	if (request[1] != STATUS_SUCCESS) {
-	    fprintf(stderr, "serial-over-lan redirection failed\n");
-	    return -1;
-	}
-	if (r->verbose) {
-	    fprintf(stderr, "serial-over-lan redirection ok\n");
-	    fprintf(stderr, "connected now, use ^] to escape\n");
-	}
-	r->connected = 1;
-	return 0;
-    case SOL_HEARTBEAT:
-    case SOL_KEEP_ALIVE_PING:
-    case IDER_HEARTBEAT:
-    case IDER_KEEP_ALIVE_PING:
-	if (rc != HEARTBEAT_LENGTH) {
-	    fprintf(stderr,"HEARTBEAT: got %d, expected %d bytes\n",
-		    rc, HEARTBEAT_LENGTH);
-	    return -1;
-	}
-	if (HEARTBEAT_LENGTH != write(r->sock, request, HEARTBEAT_LENGTH)) {
-	    perror("write(sock)");
-	    return -1;
-	}
-	return 0;
-    case SOL_DATA_FROM_HOST:
-	return redir_sol_recv(r, request, rc);
-    case END_SOL_REDIRECTION_REPLY:
-	redir_stop(r);
-	r->closed = 1;
+    fprintf(stderr, APPNAME " state: %s -> %s\n",
+	    redir_strstate(old), redir_strstate(new));
+    switch (new) {
+    case REDIR_CONN_SOL:
+	fprintf(stderr, "serial-over-lan redirection ok\n");
+	fprintf(stderr, "connected now, use ^] to escape\n");
 	break;
     default:
-	fprintf(stderr, "%s: unknown request 0x%02x\n", __FUNCTION__, request[0]);
-	return -1;
+	break;
     }
-    return 0;
 }
 
 static int redir_loop(struct redir *r)
@@ -220,9 +49,13 @@ static int redir_loop(struct redir *r)
     int rc;
     fd_set set;
 
-    for(;!r->closed;) {
+    for(;;) {
+	if (r->state == REDIR_CLOSED ||
+	    r->state == REDIR_ERROR)
+	    break;
+
 	FD_ZERO(&set);
-	if (r->connected)
+	if (r->state == REDIR_CONN_SOL)
 	    FD_SET(0,&set);
 	FD_SET(r->sock,&set);
 	tv.tv_sec  = HEARTBEAT_INTERVAL * 4 / 1000;
@@ -251,7 +84,6 @@ static int redir_loop(struct redir *r)
 		    if (r->verbose)
 			fprintf(stderr, "\n" APPNAME ": saw ^], exiting\n");
 		    redir_sol_stop(r);
-		    r->connected = 0;
 		}
 		if (-1 == redir_sol_send(r, buf, rc))
 		    return -1;
@@ -343,6 +175,10 @@ int main(int argc, char *argv[])
     r.verbose = 1;
     memcpy(r.type, "SOL ", 4);
     strcpy(r.user, "admin");
+
+    r.cb_data  = &r;
+    r.cb_recv  = recv_tty;
+    r.cb_state = state_tty;
 
     if (NULL != (h = getenv("AMT_PASSWORD")))
 	snprintf(r.pass, sizeof(r.pass), "%s", h);
