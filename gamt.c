@@ -35,6 +35,22 @@ static void menu_cb_quit(GtkMenuItem *item, void *data)
     gtk_widget_destroy(gamt->win);
 }
 
+static void menu_cb_about(GtkMenuItem *item, void *data)
+{
+    static char *comments = "Intel AMT serial-over-lan client";
+    static char *copyright = "(c) 2007 Gerd Hoffmann";
+    static char *authors[] = { "Gerd Hoffmann <kraxel@redhat.com>", NULL };
+    struct gamt_window *gamt = data;
+
+    gtk_show_about_dialog(GTK_WINDOW(gamt->win),
+                          "authors",         authors,
+                          "comments",        comments,
+                          "copyright",       copyright,
+                          "logo-icon-name",  GTK_STOCK_ABOUT,
+                          "version",         VERSION,
+                          NULL);
+}
+
 static void destroy_cb(GtkWidget *widget, gpointer data)
 {
     struct gamt_window *gamt = data;
@@ -75,7 +91,8 @@ static void user_input(VteTerminal *vte, gchar *buf, guint len,
 {
     struct gamt_window *gamt = data;
 
-    redir_sol_send(&gamt->redir, buf, len);
+    if (gamt->redir.state == REDIR_RUN_SOL)
+	redir_sol_send(&gamt->redir, buf, len);
 }
 
 /* ------------------------------------------------------------------ */
@@ -85,10 +102,26 @@ static const GtkActionEntry entries[] = {
 	.name        = "FileMenu",
 	.label       = "_File",
     },{
+	.name        = "HelpMenu",
+	.label       = "_Help",
+    },{
+
+	.name        = "Connect",
+	.label       = "_Connect ...",
+    },{
+	.name        = "Disconnect",
+	.label       = "_Disconnect",
+    },{
 	.name        = "Quit",
 	.stock_id    = GTK_STOCK_QUIT,
 	.label       = "_Quit",
 	.callback    = G_CALLBACK(menu_cb_quit),
+    },{
+
+	.name        = "About",
+	.stock_id    = GTK_STOCK_ABOUT,
+	.label       = "_About ...",
+	.callback    = G_CALLBACK(menu_cb_about),
     }
 };
 
@@ -96,7 +129,13 @@ static char ui_xml[] =
 "<ui>"
 "  <menubar name='MainMenu'>"
 "    <menu action='FileMenu'>"
+"      <menuitem action='Connect'/>"
+"      <menuitem action='Disconnect'/>"
+"      <separator/>"
 "      <menuitem action='Quit'/>"
+"    </menu>"
+"    <menu action='HelpMenu'>"
+"      <menuitem action='About'/>"
 "    </menu>"
 "  </menubar>"
 #ifdef WITH_TOOLBAR
@@ -156,7 +195,6 @@ static int gamt_connect(struct gamt_window *gamt, char *host, char *port)
 static struct gamt_window *gamt_window()
 {
     GtkWidget *vbox, *frame, *item;
-    GtkAccelGroup *accel;
     GError *err;
     struct gamt_window *gamt;
     
@@ -175,8 +213,10 @@ static struct gamt_window *gamt_window()
     gamt->ag = gtk_action_group_new("MenuActions");
     gtk_action_group_add_actions(gamt->ag, entries, G_N_ELEMENTS(entries), gamt);
     gtk_ui_manager_insert_action_group(gamt->ui, gamt->ag, 0);
-    accel = gtk_ui_manager_get_accel_group(gamt->ui);
+#if 0
+    GtkAccelGroup *accel = gtk_ui_manager_get_accel_group(gamt->ui);
     gtk_window_add_accel_group(GTK_WINDOW(gamt->win), accel);
+#endif
 
     err = NULL;
     if (!gtk_ui_manager_add_ui_from_string(gamt->ui, ui_xml, -1, &err)) {
@@ -188,8 +228,8 @@ static struct gamt_window *gamt_window()
     /* vte terminal */
     gamt->vte = vte_terminal_new();
     g_signal_connect(gamt->vte, "commit", G_CALLBACK(user_input), gamt);
-
-
+    vte_terminal_set_scrollback_lines(VTE_TERMINAL(gamt->vte), 4096);
+    
     /* other widgets */
     gamt->status = gtk_label_new("idle");
     gtk_misc_set_alignment(GTK_MISC(gamt->status), 0, 0.5);
