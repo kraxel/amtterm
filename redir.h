@@ -22,6 +22,9 @@ struct redir {
     unsigned char     type[4];
     unsigned char     user[16];
     unsigned char     pass[16];
+
+    unsigned char     buf[64];
+    unsigned int      blen;
     enum redir_state  state;
 
     /* callbacks */
@@ -40,5 +43,5 @@ int redir_auth(struct redir *r);
 int redir_sol_start(struct redir *r);
 int redir_sol_stop(struct redir *r);
 int redir_sol_send(struct redir *r, unsigned char *buf, int blen);
-int redir_sol_recv(struct redir *r, unsigned char *buf, int blen);
+int redir_sol_recv(struct redir *r);
 int redir_data(struct redir *r);

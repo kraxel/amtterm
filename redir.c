@@ -183,16 +183,20 @@ int redir_sol_send(struct redir *r, unsigned char *buf, int blen)
     return rc;
 }
 
-int redir_sol_recv(struct redir *r, unsigned char *buf, int blen)
+int redir_sol_recv(struct redir *r)
 {
     unsigned char msg[64];
-    int count, len;
+    int count, len, bshift;
 
-    len = buf[8] + (buf[9] << 8);
-    count = blen - 10;
+    len = r->buf[8] + (r->buf[9] << 8);
+    count = r->blen - 10;
+    if (count > len)
+	count = len;
+    bshift = count + 10;
     if (r->cb_recv)
-	r->cb_recv(r->cb_data, buf + 10, count);
+	r->cb_recv(r->cb_data, r->buf + 10, count);
     len -= count;
+
     while (len) {
 	count = sizeof(msg);
 	if (count > len)
@@ -211,66 +215,98 @@ int redir_sol_recv(struct redir *r, unsigned char *buf, int blen)
 	    len -= count;
 	}
     }
-    return 0;
+
+    return bshift;
 }
 
 int redir_data(struct redir *r)
 {
-    unsigned char request[64];
-    int rc;
+    int rc, bshift;
 
-    rc = read(r->sock, request, sizeof(request));
-    if (rc != 4)
+    rc = read(r->sock, r->buf + r->blen, sizeof(r->buf) - r->blen);
+    if (rc <= 0)
 	goto err;
+    r->blen += rc;
 
-    switch (request[0]) {
-    case START_REDIRECTION_SESSION_REPLY:
-	if (rc != START_REDIRECTION_SESSION_REPLY_LENGTH) {
-	    fprintf(stderr,"START_REDIRECTION_SESSION_REPLY: got %d, expected %d bytes\n",
-		    rc, START_REDIRECTION_SESSION_REPLY_LENGTH);
+    for (;;) {
+	if (r->blen < 4)
+	    goto again;
+	bshift = 0;
+
+	switch (r->buf[0]) {
+	case START_REDIRECTION_SESSION_REPLY:
+	    bshift = START_REDIRECTION_SESSION_REPLY_LENGTH;
+	    if (r->blen < bshift)
+		goto again;
+	    if (r->buf[1] != STATUS_SUCCESS) {
+		fprintf(stderr, "redirection session start failed\n");
+		goto err;
+	    }
+	    if (-1 == redir_auth(r))
+		goto err;
+	    break;
+	case AUTHENTICATE_SESSION_REPLY:
+	    bshift = r->blen; /* FIXME */
+	    if (r->blen < bshift)
+		goto again;
+	    if (r->buf[1] != STATUS_SUCCESS) {
+		fprintf(stderr, "session authentication failed\n");
+		goto err;
+	    }
+	    if (-1 == redir_sol_start(r))
+		goto err;
+	    break;
+	case START_SOL_REDIRECTION_REPLY:
+	    bshift = r->blen; /* FIXME */
+	    if (r->blen < bshift)
+		goto again;
+	    if (r->buf[1] != STATUS_SUCCESS) {
+		fprintf(stderr, "serial-over-lan redirection failed\n");
+		goto err;
+	    }
+	    redir_state(r, REDIR_RUN_SOL);
+	    break;
+	case SOL_HEARTBEAT:
+	case SOL_KEEP_ALIVE_PING:
+	case IDER_HEARTBEAT:
+	case IDER_KEEP_ALIVE_PING:
+	    bshift = HEARTBEAT_LENGTH;
+	    if (r->blen < bshift)
+		goto again;
+	    if (HEARTBEAT_LENGTH != write(r->sock, r->buf, HEARTBEAT_LENGTH)) {
+		perror("write(sock)");
+		goto err;
+	    }
+	    break;
+	case SOL_DATA_FROM_HOST:
+	    bshift = redir_sol_recv(r);
+	    if (bshift < 0)
+		goto err;
+	    break;
+	case END_SOL_REDIRECTION_REPLY:
+	    bshift = r->blen; /* FIXME */
+	    if (r->blen < bshift)
+		goto again;
+	    redir_stop(r);
+	    break;
+	default:
+	    fprintf(stderr, "%s: unknown r->buf 0x%02x\n", __FUNCTION__, r->buf[0]);
 	    goto err;
 	}
-	if (request[1] != STATUS_SUCCESS) {
-	    fprintf(stderr, "redirection session start failed\n");
-	    goto err;
+
+	if (bshift == r->blen) {
+	    r->blen = 0;
+	    break;
 	}
-	return redir_auth(r);
-    case AUTHENTICATE_SESSION_REPLY:
-	if (request[1] != STATUS_SUCCESS) {
-	    fprintf(stderr, "session authentication failed\n");
-	    goto err;
-	}
-	return redir_sol_start(r);
-    case START_SOL_REDIRECTION_REPLY:
-	if (request[1] != STATUS_SUCCESS) {
-	    fprintf(stderr, "serial-over-lan redirection failed\n");
-	    goto err;
-	}
-	redir_state(r, REDIR_RUN_SOL);
-	return 0;
-    case SOL_HEARTBEAT:
-    case SOL_KEEP_ALIVE_PING:
-    case IDER_HEARTBEAT:
-    case IDER_KEEP_ALIVE_PING:
-	if (rc < HEARTBEAT_LENGTH) {
-	    fprintf(stderr,"HEARTBEAT: got %d, expected %d bytes\n",
-		    rc, HEARTBEAT_LENGTH);
-	    goto err;
-	}
-	if (HEARTBEAT_LENGTH != write(r->sock, request, HEARTBEAT_LENGTH)) {
-	    perror("write(sock)");
-	    goto err;
-	}
-	return 0;
-    case SOL_DATA_FROM_HOST:
-	return redir_sol_recv(r, request, rc);
-    case END_SOL_REDIRECTION_REPLY:
-	redir_stop(r);
-	break;
-    default:
-	fprintf(stderr, "%s: unknown request 0x%02x\n", __FUNCTION__, request[0]);
-	goto err;
+
+	fprintf(stderr,"%s: have more data, shift by %d\n", __FUNCTION__, bshift);
+	memmove(r->buf, r->buf + bshift, r->blen - bshift);
+	r->blen -= bshift;
     }
+    return 0;
+
+again:
+    fprintf(stderr,"%s: need more data\n", __FUNCTION__);
     return 0;
 
 err:
