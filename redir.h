@@ -15,17 +15,20 @@ enum redir_state {
 };
 
 struct redir {
-    int               sock;
-    int               verbose;
+    /* host connection */
     unsigned char     host[64];
     unsigned char     port[16];
-    unsigned char     type[4];
     unsigned char     user[16];
     unsigned char     pass[16];
 
+    /* serial-over-lan */
+    unsigned char     type[4];
+    int               verbose;
+    enum redir_state  state;
+
+    int               sock;
     unsigned char     buf[64];
     unsigned int      blen;
-    enum redir_state  state;
 
     /* callbacks */
     void *cb_data;

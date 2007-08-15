@@ -311,5 +311,6 @@ again:
 
 err:
     redir_state(r, REDIR_ERROR);
+    close(r->sock);
     return -1;
 }
