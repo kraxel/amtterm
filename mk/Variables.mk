@@ -17,6 +17,7 @@ ifneq ($(wildcard $(srcdir)/VERSION),)
 else
   VERSION := 42
 endif
+RELTAG	:= v$(subst .,_,$(VERSION))
 
 # programs
 CC		?= gcc
