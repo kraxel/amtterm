@@ -55,13 +55,6 @@ static void menu_cb_connect(GtkMenuItem *item, void *data)
     if (0 != rc)
 	return;
 
-    if (0 == strlen(amt_pass)) {
-	rc = gamt_getstring(gamt->win, "Authentication",
-			    "Password ?",
-			    amt_pass, sizeof(amt_pass), 1);
-	if (0 != rc)
-	    return;
-    }
     gamt_connect(gamt);
 }
 
@@ -217,17 +210,23 @@ static int gamt_getstring(GtkWidget *window, char *title, char *message,
 					 GTK_STOCK_CANCEL,
 					 GTK_RESPONSE_REJECT,
                                          NULL);
-
+    gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_ACCEPT);
+    
     label = gtk_label_new(message);
+    gtk_misc_set_alignment(GTK_MISC(label), 0, 0.5);
+
     entry = gtk_entry_new();
     gtk_entry_set_text(GTK_ENTRY(entry), dest);
+    gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
     if (hide)
 	gtk_entry_set_visibility(GTK_ENTRY(entry), FALSE);
-    gtk_box_set_spacing(GTK_BOX(GTK_DIALOG(dialog)->vbox), 10);
-    
+
     gtk_container_add(GTK_CONTAINER(GTK_DIALOG(dialog)->vbox), label);
     gtk_container_add(GTK_CONTAINER(GTK_DIALOG(dialog)->vbox), entry);
-    gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_ACCEPT);
+    gtk_box_set_spacing(GTK_BOX(GTK_DIALOG(dialog)->vbox), 10);
+#if 0 /* FIXME: doesn't work ... */
+    gtk_container_set_border_width(GTK_CONTAINER(GTK_DIALOG(dialog)->vbox), 10);
+#endif
 
     /* show and wait for response */
     gtk_widget_show_all(dialog);
@@ -264,6 +263,19 @@ static gboolean gamt_data(GIOChannel *source, GIOCondition condition,
 
 static int gamt_connect(struct gamt_window *gamt)
 {
+    int rc;
+    
+    if (0 == strlen(amt_pass)) {
+	char msg[128];
+
+	snprintf(msg, sizeof(msg), "AMT password for %s@%s ?",
+		 amt_user, amt_host);
+	rc = gamt_getstring(gamt->win, "Authentication", msg,
+			    amt_pass, sizeof(amt_pass), 1);
+	if (0 != rc)
+	    return -1;
+    }
+
     memset(&gamt->redir, 0, sizeof(gamt->redir));
     memcpy(&gamt->redir.type, "SOL ", 4);
 
