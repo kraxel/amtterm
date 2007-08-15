@@ -39,8 +39,8 @@ LDLIBS += $(shell test "$(pkglst)" != "" && pkg-config --libs   $(pkglst))
 build: $(TARGETS)
 
 install: build
-	mkdir -p $(DESTDIR)$(bindir)
-	install -s $(TARGETS) $(DESTDIR)$(bindir)
+	mkdir -p $(bindir)
+	install -s $(TARGETS) $(bindir)
 
 clean:
 	rm -f *.o *~
