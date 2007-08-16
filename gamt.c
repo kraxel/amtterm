@@ -443,7 +443,6 @@ static void gamt_rebuild_hosts(struct gamt_window *gamt)
 	gtk_action_group_add_actions(gamt->hosts_ag, &entry, 1, gamt);
     }
     pos += sprintf(hosts_xml+pos, "%s", hosts_xml_end);
-    fprintf(stderr, "%s", hosts_xml);
     
     /* add */
     gtk_ui_manager_insert_action_group(gamt->ui, gamt->hosts_ag, 1);

@@ -299,14 +299,14 @@ int redir_data(struct redir *r)
 	    break;
 	}
 
-	fprintf(stderr,"%s: have more data, shift by %d\n", __FUNCTION__, bshift);
+	/* have more data, shift by bshift */
 	memmove(r->buf, r->buf + bshift, r->blen - bshift);
 	r->blen -= bshift;
     }
     return 0;
 
 again:
-    fprintf(stderr,"%s: need more data\n", __FUNCTION__);
+    /* need more data, jump back into poll/select loop */
     return 0;
 
 err:
