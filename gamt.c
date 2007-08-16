@@ -10,7 +10,10 @@
 #include <gtk/gtk.h>
 #include <vte/vte.h>
 
+#include "parseconfig.h"
 #include "redir.h"
+
+#define APPNAME "gamt"
 
 struct gamt_window {
     /* gtk stuff */
@@ -30,11 +33,17 @@ static char amt_host[64];
 static char amt_port[16];
 static char amt_user[32] = "admin";
 static char amt_pass[32];
-static char vte_font[64];
 
 static int gamt_getstring(GtkWidget *window, char *title, char *message,
 			  char *dest, int dlen, int hide);
 static int gamt_connect(struct gamt_window *gamt);
+
+/* ------------------------------------------------------------------ */
+
+#define CFG_SECTION       "config", "config"
+#define CFG_FONT          CFG_SECTION, "font"
+#define CFG_FOREGROUND    CFG_SECTION, "foreground"
+#define CFG_BACKGROUND    CFG_SECTION, "background"
 
 /* ------------------------------------------------------------------ */
 
@@ -65,6 +74,76 @@ static void menu_cb_disconnect(GtkMenuItem *item, void *data)
     if (gamt->redir.state != REDIR_RUN_SOL)
 	return;
     redir_sol_stop(&gamt->redir);
+}
+
+static void menu_cb_config_font(GtkMenuItem *item, void *data)
+{
+    struct gamt_window *gamt = data;
+    GtkWidget *dialog;
+    char *fontname;
+
+    dialog = gtk_font_selection_dialog_new("Terminal font");
+    fontname = cfg_get_str(CFG_FONT);
+    gtk_font_selection_dialog_set_font_name
+	(GTK_FONT_SELECTION_DIALOG(dialog), fontname);
+    gtk_widget_show_all(dialog);
+    if (GTK_RESPONSE_OK == gtk_dialog_run(GTK_DIALOG(dialog))) {
+	fontname = gtk_font_selection_dialog_get_font_name
+	    (GTK_FONT_SELECTION_DIALOG(dialog));
+	vte_terminal_set_font_from_string(VTE_TERMINAL(gamt->vte), fontname);
+	cfg_set_str(CFG_FONT, fontname);
+    }
+    gtk_widget_destroy(dialog);
+}
+
+static int pickcolor(char *title, GdkColor *color)
+{
+    GtkWidget *dialog;
+    GtkColorSelection *csel;
+    int rc = -1;
+
+    dialog = gtk_color_selection_dialog_new(title);
+    csel = GTK_COLOR_SELECTION(GTK_COLOR_SELECTION_DIALOG(dialog)->colorsel);
+    gtk_color_selection_set_has_opacity_control(csel, FALSE);
+    gtk_color_selection_set_current_color(csel, color);
+    
+    gtk_widget_show_all(dialog);
+    if (GTK_RESPONSE_OK == gtk_dialog_run(GTK_DIALOG(dialog))) {
+	gtk_color_selection_get_current_color(csel, color);
+	rc = 0;
+    }
+    gtk_widget_destroy(dialog);
+    return rc;
+}
+
+static void menu_cb_config_fg(GtkMenuItem *item, void *data)
+{
+    struct gamt_window *gamt = data;
+    GdkColor color = {0,0,0,0};
+    char name[16];
+
+    gdk_color_parse(cfg_get_str(CFG_FOREGROUND), &color);
+    if (0 != pickcolor("Text color", &color))
+	return;
+    vte_terminal_set_color_foreground(VTE_TERMINAL(gamt->vte), &color);
+    snprintf(name, sizeof(name), "#%04x%04x%04x",
+	     color.red, color.green, color.blue);
+    cfg_set_str(CFG_FOREGROUND, name);
+}
+
+static void menu_cb_config_bg(GtkMenuItem *item, void *data)
+{
+    struct gamt_window *gamt = data;
+    GdkColor color = {0,0,0,0};
+    char name[16];
+
+    gdk_color_parse(cfg_get_str(CFG_BACKGROUND), &color);
+    if (0 != pickcolor("Background color", &color))
+	return;
+    vte_terminal_set_color_background(VTE_TERMINAL(gamt->vte), &color);
+    snprintf(name, sizeof(name), "#%04x%04x%04x",
+	     color.red, color.green, color.blue);
+    cfg_set_str(CFG_BACKGROUND, name);
 }
 
 static void menu_cb_quit(GtkMenuItem *item, void *data)
@@ -145,16 +224,21 @@ static const GtkActionEntry entries[] = {
 	.name        = "FileMenu",
 	.label       = "_File",
     },{
+	.name        = "ConfigMenu",
+	.label       = "_Options",
+    },{
 	.name        = "HelpMenu",
 	.label       = "_Help",
     },{
 
 	/* File menu */
 	.name        = "Connect",
+	.stock_id    = GTK_STOCK_CONNECT,
 	.label       = "_Connect ...",
 	.callback    = G_CALLBACK(menu_cb_connect),
     },{
 	.name        = "Disconnect",
+	.stock_id    = GTK_STOCK_DISCONNECT,
 	.label       = "_Disconnect",
 	.callback    = G_CALLBACK(menu_cb_disconnect),
     },{
@@ -162,6 +246,21 @@ static const GtkActionEntry entries[] = {
 	.stock_id    = GTK_STOCK_QUIT,
 	.label       = "_Quit",
 	.callback    = G_CALLBACK(menu_cb_quit),
+    },{
+
+	/* Config menu */
+	.name        = "VteFont",
+	.stock_id    = GTK_STOCK_SELECT_FONT,
+	.label       = "Terminal _font ...",
+	.callback    = G_CALLBACK(menu_cb_config_font),
+    },{
+	.name        = "VteForeground",
+	.label       = "_Text Color ...",
+	.callback    = G_CALLBACK(menu_cb_config_fg),
+    },{
+	.name        = "VteBackground",
+	.label       = "_Background Color ...",
+	.callback    = G_CALLBACK(menu_cb_config_bg),
     },{
 
 	/* Help menu */
@@ -181,15 +280,20 @@ static char ui_xml[] =
 "      <separator/>"
 "      <menuitem action='Quit'/>"
 "    </menu>"
+"    <menu action='ConfigMenu'>"
+"      <menuitem action='VteFont'/>"
+"      <menuitem action='VteForeground'/>"
+"      <menuitem action='VteBackground'/>"
+"    </menu>"
 "    <menu action='HelpMenu'>"
 "      <menuitem action='About'/>"
 "    </menu>"
 "  </menubar>"
-#ifdef WITH_TOOLBAR
 "  <toolbar action='ToolBar'>"
-"    <toolitem action='Close'/>"
+"    <toolitem action='Quit'/>"
+"    <toolitem action='Connect'/>"
+"    <toolitem action='Disconnect'/>"
 "  </toolbar>"
-#endif
 "</ui>";
 
 /* ------------------------------------------------------------------ */
@@ -302,8 +406,10 @@ static int gamt_connect(struct gamt_window *gamt)
 static struct gamt_window *gamt_window()
 {
     GtkWidget *vbox, *frame, *item;
+    GdkColor color;
     GError *err;
     struct gamt_window *gamt;
+    char *str;
     
     gamt = malloc(sizeof(*gamt));
     if (NULL == gamt)
@@ -336,8 +442,9 @@ static struct gamt_window *gamt_window()
     gamt->vte = vte_terminal_new();
     g_signal_connect(gamt->vte, "commit", G_CALLBACK(user_input), gamt);
     vte_terminal_set_scrollback_lines(VTE_TERMINAL(gamt->vte), 4096);
-    if (strlen(vte_font))
-	vte_terminal_set_font_from_string(VTE_TERMINAL(gamt->vte), vte_font);
+    str = cfg_get_str(CFG_FONT);
+    if (str)
+	vte_terminal_set_font_from_string(VTE_TERMINAL(gamt->vte), str);
 
     /* other widgets */
     gamt->status = gtk_label_new("idle");
@@ -350,9 +457,10 @@ static struct gamt_window *gamt_window()
     gtk_container_add(GTK_CONTAINER(gamt->win), vbox);
     item = gtk_ui_manager_get_widget(gamt->ui, "/MainMenu");
     gtk_box_pack_start(GTK_BOX(vbox), item, FALSE, FALSE, 0);
+#if 0
     item = gtk_ui_manager_get_widget(gamt->ui, "/ToolBar");
-    if (item)
-	gtk_box_pack_start(GTK_BOX(vbox), item, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), item, FALSE, FALSE, 0);
+#endif
     gtk_box_pack_start(GTK_BOX(vbox), gamt->vte, TRUE, TRUE, 0);
 
     frame = gtk_frame_new(NULL);
@@ -362,6 +470,17 @@ static struct gamt_window *gamt_window()
     /* display window */
     gtk_widget_show_all(gamt->win);
     
+    str = cfg_get_str(CFG_FOREGROUND);
+    if (str) {
+	gdk_color_parse(str, &color);
+	vte_terminal_set_color_foreground(VTE_TERMINAL(gamt->vte), &color);
+    }
+    str = cfg_get_str(CFG_BACKGROUND);
+    if (str) {
+	gdk_color_parse(str, &color);
+	vte_terminal_set_color_background(VTE_TERMINAL(gamt->vte), &color);
+    }
+
     return gamt;
 }
 
@@ -370,16 +489,32 @@ static struct gamt_window *gamt_window()
 static void usage(FILE *fp)
 {
     fprintf(fp,
-	    "TODO: help test\n"
-	    "\n"
-	    "-- \n"
-	    "(c) 2007 Gerd Hoffmann <kraxel@redhat.com>\n");
+            "\n"
+	    "This is " APPNAME ", release " VERSION ", I'll establish\n"
+	    "serial-over-lan (sol) connections to your Intel AMT boxes.\n"
+            "\n"
+            "usage: " APPNAME " [options] host\n"
+            "options:\n"
+            "   -h            print this text\n"
+            "   -u user       username (default: admin)\n"
+            "   -p pass       password (default: $AMT_PASSWORD)\n"
+            "   -f font       terminal font\n"
+            "   -c color      text color\n"
+            "   -b color      backgrounf color\n"
+            "\n"
+            "By default port 16994 is used.\n"
+	    "If no password is given " APPNAME " will ask for one.\n"
+            "\n"
+            "-- \n"
+            "(c) 2007 Gerd Hoffmann <kraxel@redhat.com>\n"
+	    "\n");
 }
 
 int
 main(int argc, char *argv[])
 {
     struct gamt_window *gamt;
+    char configfile[256];
     char *h;
     int debug = 0;
     int c;
@@ -387,9 +522,19 @@ main(int argc, char *argv[])
     if (NULL != (h = getenv("AMT_PASSWORD")))
 	snprintf(amt_pass, sizeof(amt_pass), "%s", h);
 
+    /* read config, make sure we have sane defaults */
+    snprintf(configfile, sizeof(configfile), "%s/.gamtrc", getenv("HOME"));
+    cfg_parse_file("config", configfile);
+    if (!cfg_get_str(CFG_FONT))
+	cfg_set_str(CFG_FONT, "monospace 12");
+    if (!cfg_get_str(CFG_FOREGROUND))
+	cfg_set_str(CFG_FOREGROUND, "gray");
+    if (!cfg_get_str(CFG_BACKGROUND))
+	cfg_set_str(CFG_BACKGROUND, "black");
+
     gtk_init(&argc, &argv);
     for (;;) {
-        if (-1 == (c = getopt(argc, argv, "hdu:p:f:")))
+        if (-1 == (c = getopt(argc, argv, "hdu:p:f:c:b:")))
             break;
         switch (c) {
 	case 'd':
@@ -403,7 +548,13 @@ main(int argc, char *argv[])
 	    memset(optarg,'*',strlen(optarg)); /* rm passwd from ps list */
 	    break;
 	case 'f':
-	    snprintf(vte_font, sizeof(vte_font), "%s", optarg);
+	    cfg_set_str(CFG_FONT, optarg);
+	    break;
+	case 'c':
+	    cfg_set_str(CFG_FOREGROUND, optarg);
+	    break;
+	case 'b':
+	    cfg_set_str(CFG_BACKGROUND, optarg);
 	    break;
 
         case 'h':
@@ -425,5 +576,6 @@ main(int argc, char *argv[])
     }
     
     gtk_main();
+    cfg_write_file("config", configfile);
     exit(0);
 }
