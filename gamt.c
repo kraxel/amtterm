@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <locale.h>
 #include <signal.h>
+#include <ctype.h>
 
 #include <gtk/gtk.h>
 #include <vte/vte.h>
@@ -23,6 +24,9 @@ struct gamt_window {
     GtkWidget      *vte;
     GtkWidget      *status;
 
+    GtkActionGroup *hosts_ag;
+    guint          hosts_id;
+
     /* sol stuff */
     struct redir   redir;
     GIOChannel     *ch;
@@ -37,6 +41,7 @@ static char amt_pass[32];
 static int gamt_getstring(GtkWidget *window, char *title, char *message,
 			  char *dest, int dlen, int hide);
 static int gamt_connect(struct gamt_window *gamt);
+static void gamt_rebuild_hosts(struct gamt_window *gamt);
 
 /* ------------------------------------------------------------------ */
 
@@ -47,7 +52,7 @@ static int gamt_connect(struct gamt_window *gamt);
 
 /* ------------------------------------------------------------------ */
 
-static void menu_cb_connect(GtkMenuItem *item, void *data)
+static void menu_cb_connect(GtkAction *action, void *data)
 {
     struct gamt_window *gamt = data;
     int rc;
@@ -67,7 +72,22 @@ static void menu_cb_connect(GtkMenuItem *item, void *data)
     gamt_connect(gamt);
 }
 
-static void menu_cb_disconnect(GtkMenuItem *item, void *data)
+static void menu_cb_connect_to(GtkAction *action, void *data)
+{
+    struct gamt_window *gamt = data;
+    
+    if (gamt->redir.state != REDIR_NONE &&
+	gamt->redir.state != REDIR_CLOSED &&
+	gamt->redir.state != REDIR_ERROR)
+	/* already have an active connection */
+	return;
+
+    if (1 != sscanf(gtk_action_get_name(action), "ConnectTo_%s", amt_host))
+	return;
+    gamt_connect(gamt);
+}
+
+static void menu_cb_disconnect(GtkAction *action, void *data)
 {
     struct gamt_window *gamt = data;
 
@@ -76,7 +96,7 @@ static void menu_cb_disconnect(GtkMenuItem *item, void *data)
     redir_sol_stop(&gamt->redir);
 }
 
-static void menu_cb_config_font(GtkMenuItem *item, void *data)
+static void menu_cb_config_font(GtkAction *action, void *data)
 {
     struct gamt_window *gamt = data;
     GtkWidget *dialog;
@@ -116,7 +136,7 @@ static int pickcolor(char *title, GdkColor *color)
     return rc;
 }
 
-static void menu_cb_config_fg(GtkMenuItem *item, void *data)
+static void menu_cb_config_fg(GtkAction *action, void *data)
 {
     struct gamt_window *gamt = data;
     GdkColor color = {0,0,0,0};
@@ -131,7 +151,7 @@ static void menu_cb_config_fg(GtkMenuItem *item, void *data)
     cfg_set_str(CFG_FOREGROUND, name);
 }
 
-static void menu_cb_config_bg(GtkMenuItem *item, void *data)
+static void menu_cb_config_bg(GtkAction *action, void *data)
 {
     struct gamt_window *gamt = data;
     GdkColor color = {0,0,0,0};
@@ -146,14 +166,14 @@ static void menu_cb_config_bg(GtkMenuItem *item, void *data)
     cfg_set_str(CFG_BACKGROUND, name);
 }
 
-static void menu_cb_quit(GtkMenuItem *item, void *data)
+static void menu_cb_quit(GtkAction *action, void *data)
 {
     struct gamt_window *gamt = data;
 
     gtk_widget_destroy(gamt->win);
 }
 
-static void menu_cb_about(GtkMenuItem *item, void *data)
+static void menu_cb_about(GtkAction *action, void *data)
 {
     static char *comments = "Intel AMT serial-over-lan client";
     static char *copyright = "(c) 2007 Gerd Hoffmann";
@@ -200,6 +220,11 @@ static void state_gtk(void *cb_data, enum redir_state old, enum redir_state new)
 	    strcpy(amt_pass, "");
 	}
 	break;
+    case REDIR_RUN_SOL:
+	cfg_set_int("config", "hosts", gamt->redir.host,
+		    cfg_get_int("config", "hosts", gamt->redir.host, 0) +1);
+	gamt_rebuild_hosts(gamt);
+	/* fall through */
     default:
 	snprintf(buf, sizeof(buf), "%s: %s", gamt->redir.host,
 		 redir_state_desc(new));
@@ -226,6 +251,9 @@ static const GtkActionEntry entries[] = {
     },{
 	.name        = "ConfigMenu",
 	.label       = "_Options",
+    },{
+	.name        = "HostMenu",
+	.label       = "Ho_sts",
     },{
 	.name        = "HelpMenu",
 	.label       = "_Help",
@@ -272,29 +300,41 @@ static const GtkActionEntry entries[] = {
 };
 
 static char ui_xml[] =
-"<ui>"
-"  <menubar name='MainMenu'>"
-"    <menu action='FileMenu'>"
-"      <menuitem action='Connect'/>"
-"      <menuitem action='Disconnect'/>"
-"      <separator/>"
-"      <menuitem action='Quit'/>"
-"    </menu>"
-"    <menu action='ConfigMenu'>"
-"      <menuitem action='VteFont'/>"
-"      <menuitem action='VteForeground'/>"
-"      <menuitem action='VteBackground'/>"
-"    </menu>"
-"    <menu action='HelpMenu'>"
-"      <menuitem action='About'/>"
-"    </menu>"
-"  </menubar>"
-"  <toolbar action='ToolBar'>"
-"    <toolitem action='Quit'/>"
-"    <toolitem action='Connect'/>"
-"    <toolitem action='Disconnect'/>"
-"  </toolbar>"
-"</ui>";
+"<ui>\n"
+"  <menubar action='MainMenu'>\n"
+"    <menu action='FileMenu'>\n"
+"      <menuitem action='Connect'/>\n"
+"      <menuitem action='Disconnect'/>\n"
+"      <separator/>\n"
+"      <menuitem action='Quit'/>\n"
+"    </menu>\n"
+"    <menu action='HostMenu'>\n"
+"    </menu>\n"
+"    <menu action='ConfigMenu'>\n"
+"      <menuitem action='VteFont'/>\n"
+"      <menuitem action='VteForeground'/>\n"
+"      <menuitem action='VteBackground'/>\n"
+"    </menu>\n"
+"    <menu action='HelpMenu'>\n"
+"      <menuitem action='About'/>\n"
+"    </menu>\n"
+"  </menubar>\n"
+"  <toolbar action='ToolBar'>\n"
+"    <toolitem action='Quit'/>\n"
+"    <toolitem action='Connect'/>\n"
+"    <toolitem action='Disconnect'/>\n"
+"  </toolbar>\n"
+"</ui>\n";
+
+static char hosts_xml_start[] =
+"<ui>\n"
+"  <menubar name='MainMenu'>\n"
+"    <menu action='HostMenu'>\n";
+
+static char hosts_xml_end[] =
+"    </menu>\n"
+"  </menubar>\n"
+"</ui>\n";
 
 /* ------------------------------------------------------------------ */
 
@@ -363,6 +403,55 @@ static gboolean gamt_data(GIOChannel *source, GIOCondition condition,
 	gamt->ch = NULL;
     }
     return TRUE;
+}
+
+static void gamt_rebuild_hosts(struct gamt_window *gamt)
+{
+    int count, size, pos;
+    char *hosts_xml, *host, action[128];
+    GtkActionEntry entry;
+    GError *err = NULL;
+
+    /* remove */
+    if (gamt->hosts_id) {
+	gtk_ui_manager_remove_ui(gamt->ui, gamt->hosts_id);
+	gamt->hosts_id = 0;
+    }
+    if (gamt->hosts_ag) {
+	gtk_ui_manager_remove_action_group(gamt->ui, gamt->hosts_ag);
+	g_object_unref(gamt->hosts_ag);
+	gamt->hosts_ag = NULL;
+    }
+
+    /* build */
+    memset(&entry, 0, sizeof(entry));
+    entry.callback = G_CALLBACK(menu_cb_connect_to);
+    gamt->hosts_ag = gtk_action_group_new("HostActions");
+    count = cfg_entries_count("config", "hosts");
+    size = 128 * count + sizeof(hosts_xml_start) + sizeof(hosts_xml_end);
+    hosts_xml = malloc(size); pos = 0;
+    pos += sprintf(hosts_xml+pos, "%s", hosts_xml_start);
+    for (host = cfg_entries_first("config", "hosts");
+	 NULL != host;
+	 host = cfg_entries_next("config", "hosts", host)) {
+	snprintf(action, sizeof(action), "ConnectTo_%s", host);
+	pos += snprintf(hosts_xml+pos, 128,
+			"      <menuitem action='%s'/>\n",
+			action);
+	entry.name = action;
+	entry.label = host;
+	gtk_action_group_add_actions(gamt->hosts_ag, &entry, 1, gamt);
+    }
+    pos += sprintf(hosts_xml+pos, "%s", hosts_xml_end);
+    fprintf(stderr, "%s", hosts_xml);
+    
+    /* add */
+    gtk_ui_manager_insert_action_group(gamt->ui, gamt->hosts_ag, 1);
+    gamt->hosts_id = gtk_ui_manager_add_ui_from_string(gamt->ui, hosts_xml, -1, &err);
+    if (!gamt->hosts_id) {
+	g_message("building host menu failed: %s", err->message);
+	g_error_free(err);
+    }
 }
 
 static int gamt_connect(struct gamt_window *gamt)
@@ -437,6 +526,7 @@ static struct gamt_window *gamt_window()
 	g_error_free(err);
 	exit(1);
     }
+    gamt_rebuild_hosts(gamt);
 
     /* vte terminal */
     gamt->vte = vte_terminal_new();
