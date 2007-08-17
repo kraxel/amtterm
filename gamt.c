@@ -37,6 +37,7 @@ static char amt_host[64];
 static char amt_port[16];
 static char amt_user[32] = "admin";
 static char amt_pass[32];
+static int amt_trace;
 
 static int gamt_getstring(GtkWidget *window, char *title, char *message,
 			  char *dest, int dlen, int hide);
@@ -477,6 +478,7 @@ static int gamt_connect(struct gamt_window *gamt)
     snprintf(gamt->redir.pass, sizeof(gamt->redir.pass), "%s", amt_pass);
 
     gamt->redir.verbose  = 1;
+    gamt->redir.trace    = amt_trace;
     gamt->redir.cb_data  = gamt;
     gamt->redir.cb_recv  = recv_gtk;
     gamt->redir.cb_state = state_gtk;
@@ -623,11 +625,14 @@ main(int argc, char *argv[])
 
     gtk_init(&argc, &argv);
     for (;;) {
-        if (-1 == (c = getopt(argc, argv, "hdu:p:f:c:b:")))
+        if (-1 == (c = getopt(argc, argv, "hdtu:p:f:c:b:")))
             break;
         switch (c) {
 	case 'd':
 	    debug++;
+	    break;
+	case 't':
+	    amt_trace++;
 	    break;
 	case 'u':
 	    snprintf(amt_user, sizeof(amt_user), "%s", optarg);

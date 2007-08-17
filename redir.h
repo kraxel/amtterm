@@ -24,6 +24,7 @@ struct redir {
     /* serial-over-lan */
     unsigned char     type[4];
     int               verbose;
+    int               trace;
     enum redir_state  state;
 
     int               sock;

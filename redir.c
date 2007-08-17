@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "tcp.h"
 #include "redir.h"
@@ -35,6 +36,44 @@ static const char *state_desc[] = {
 };
 
 /* ------------------------------------------------------------------ */
+
+static void hexdump(const char *prefix, const unsigned char *data, size_t size)
+{
+    char ascii[17];
+    int i;
+
+    for (i = 0; i < size; i++) {
+	if (0 == (i%16)) {
+	    fprintf(stderr,"%s%s%04x:",
+		    prefix ? prefix : "",
+		    prefix ? ": "   : "",
+		    i);
+	    memset(ascii,0,sizeof(ascii));
+	}
+	if (0 == (i%4))
+	    fprintf(stderr," ");
+	fprintf(stderr," %02x",data[i]);
+	ascii[i%16] = isprint(data[i]) ? data[i] : '.';
+	if (15 == (i%16))
+	    fprintf(stderr,"  %s\n",ascii);
+    }
+    if (0 != (i%16)) {
+	while (0 != (i%16)) {
+	    if (0 == (i%4))
+		fprintf(stderr," ");
+	    fprintf(stderr,"   ");
+	    i++;
+	};
+	fprintf(stderr," %s\n",ascii);
+    }
+}
+
+static ssize_t redir_write(struct redir *r, const char *buf, size_t count)
+{
+    if (r->trace)
+	hexdump("out", buf, count);
+    return write(r->sock, buf, count);
+}
 
 static void redir_state(struct redir *r, enum redir_state new)
 {
@@ -96,7 +135,7 @@ int redir_start(struct redir *r)
 
     memcpy(request+4, r->type, 4);
     redir_state(r, REDIR_INIT);
-    return write(r->sock, request, sizeof(request));
+    return redir_write(r, request, sizeof(request));
 }
 
 int redir_stop(struct redir *r)
@@ -106,7 +145,7 @@ int redir_stop(struct redir *r)
     };
 
     redir_state(r, REDIR_CLOSED);
-    write(r->sock, request, sizeof(request));
+    redir_write(r, request, sizeof(request));
     close(r->sock);
     return 0;
 }
@@ -128,7 +167,7 @@ int redir_auth(struct redir *r)
     request[10 + ulen] = plen;
     memcpy(request + 11 + ulen, r->pass, plen);
     redir_state(r, REDIR_AUTH);
-    rc = write(r->sock, request, len);
+    rc = redir_write(r, request, len);
     free(request);
     return rc;
 }
@@ -153,7 +192,7 @@ int redir_sol_start(struct redir *r)
     };
 
     redir_state(r, REDIR_INIT_SOL);
-    return write(r->sock, request, sizeof(request));
+    return redir_write(r, request, sizeof(request));
 }
 
 int redir_sol_stop(struct redir *r)
@@ -164,7 +203,7 @@ int redir_sol_stop(struct redir *r)
     };
 
     redir_state(r, REDIR_CLOSING);
-    return write(r->sock, request, sizeof(request));
+    return redir_write(r, request, sizeof(request));
 }
 
 int redir_sol_send(struct redir *r, unsigned char *buf, int blen)
@@ -178,7 +217,7 @@ int redir_sol_send(struct redir *r, unsigned char *buf, int blen)
     request[8] = blen & 0xff;
     request[9] = blen >> 8;
     memcpy(request + 10, buf, blen);
-    rc = write(r->sock, request, len);
+    rc = redir_write(r, request, len);
     free(request);
     return rc;
 }
@@ -210,6 +249,8 @@ int redir_sol_recv(struct redir *r)
 	    fprintf(stderr, "EOF from socket\n");
 	    return -1;
 	default:
+	    if (r->trace)
+		hexdump("in+", msg, count);
 	    if (r->cb_recv)
 		r->cb_recv(r->cb_data, msg, count);
 	    len -= count;
@@ -224,8 +265,12 @@ int redir_data(struct redir *r)
     int rc, bshift;
 
     rc = read(r->sock, r->buf + r->blen, sizeof(r->buf) - r->blen);
-    if (rc <= 0)
+    if (rc <= 0) {
+	perror("read(sock)");
 	goto err;
+    }
+    if (r->trace)
+	hexdump("in ", r->buf + r->blen, rc);
     r->blen += rc;
 
     for (;;) {
@@ -273,7 +318,7 @@ int redir_data(struct redir *r)
 	    bshift = HEARTBEAT_LENGTH;
 	    if (r->blen < bshift)
 		goto again;
-	    if (HEARTBEAT_LENGTH != write(r->sock, r->buf, HEARTBEAT_LENGTH)) {
+	    if (HEARTBEAT_LENGTH != redir_write(r, r->buf, HEARTBEAT_LENGTH)) {
 		perror("write(sock)");
 		goto err;
 	    }
