@@ -41,6 +41,7 @@ build: $(TARGETS)
 install: build
 	mkdir -p $(bindir)
 	install -s $(TARGETS) $(bindir)
+	install amttool $(bindir)
 
 clean:
 	rm -f *.o *~

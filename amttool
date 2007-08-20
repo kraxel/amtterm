@@ -1,0 +1,84 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use SOAP::Lite;
+
+my $amt_host = shift;
+my $amt_port = "16992";
+$main::amt_user = "admin";
+$main::amt_pass = $ENV{'AMT_PASSWORD'};
+
+sub SOAP::Transport::HTTP::Client::get_basic_credentials {
+	return $main::amt_user => $main::amt_pass;
+}
+
+#########################################################################################
+#
+
+my @ps = ("S0", "S1", "S2", "S3", "S4", "S5 (soft-off)", "S4/S5", "Off");
+
+#########################################################################################
+# main
+
+if (!defined($amt_host)) {
+	print STDERR <<EOF;
+
+This utility can talk to Intel AMT managed machines.
+
+usage: amttool [ options ] <hostname>
+options:
+  none yet, right now it just gathers and prints some infos.
+
+Password is passed via AMT_PASSWORD environment variable.
+
+EOF
+	exit 1;
+}
+
+my $nas = SOAP::Lite->new(
+	proxy => "http://$amt_host:$amt_port/NetworkAdministrationService",
+	ns    => "http://schemas.intel.com/platform/client/NetworkAdministration/2004/01");
+my $sas = SOAP::Lite->new(
+	proxy => "http://$amt_host:$amt_port/SecurityAdministrationService",
+	ns    => "http://schemas.intel.com/platform/client/SecurityAdministration/2004/01");
+my $rcs = SOAP::Lite->new(
+	proxy => "http://$amt_host:$amt_port/RemoteControlService",
+	ns    => "http://schemas.intel.com/platform/client/RemoteControl/2004/01");
+
+printf "### query host %s ###\n", $amt_host;
+
+my $amt_version = $sas->GetCoreVersion()->paramsout;
+printf "AMT version:  %s\n", $amt_version;
+
+my $hostname = $nas->GetHostName()->paramsout;
+my $domainname = $nas->GetDomainName()->paramsout;
+printf "Hostname:     %s.%s\n", $hostname, $domainname;
+
+my $powerstate = $rcs->GetSystemPowerState()->paramsout;
+printf "Powerstate:   %s\n", $ps [ $powerstate & 0x0f ];
+
+my @rccaps = $rcs->GetRemoteControlCapabilities()->paramsout;
+printf "Remote Capabilities:\n";
+printf "   IanaOemNumber                %x\n", $rccaps[0];
+printf "   OemDefinedCapabilities       %s%s%s%s%s\n",
+	$rccaps[1] & 0x01 ? "IDER "        : "",
+	$rccaps[1] & 0x02 ? "SOL "         : "",
+	$rccaps[1] & 0x04 ? "BiosReflash " : "",
+	$rccaps[1] & 0x08 ? "BiosSetup "   : "",
+	$rccaps[1] & 0x10 ? "BiosPause "   : "";
+
+printf "   SpecialCommandsSupported     %s%s%s%s%s\n",
+	$rccaps[2] & 0x0100 ? "PXE-boot "         : "",
+	$rccaps[2] & 0x0200 ? "HD-boot "          : "",
+	$rccaps[2] & 0x0400 ? "HD-boot-safemode " : "",
+	$rccaps[2] & 0x0800 ? "diag-boot "        : "",
+	$rccaps[2] & 0x1000 ? "cd-boot "          : "";
+
+printf "   SystemCapabilitiesSupported  %s%s%s%s\n",
+	$rccaps[3] & 0x01 ? "powercycle " : "",
+	$rccaps[3] & 0x02 ? "powerdown "  : "",
+	$rccaps[3] & 0x03 ? "powerup "    : "",
+	$rccaps[3] & 0x04 ? "reset "      : "";
+
+printf "   SystemFirmwareCapabilities   %x\n", $rccaps[4];
+
