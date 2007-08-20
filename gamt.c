@@ -211,6 +211,7 @@ static void state_gtk(void *cb_data, enum redir_state old, enum redir_state new)
 {
     struct gamt_window *gamt = cb_data;
     unsigned char buf[128];
+    int last;
 
     switch (new) {
     case REDIR_ERROR:
@@ -222,9 +223,10 @@ static void state_gtk(void *cb_data, enum redir_state old, enum redir_state new)
 	}
 	break;
     case REDIR_RUN_SOL:
-	cfg_set_int("config", "hosts", gamt->redir.host,
-		    cfg_get_int("config", "hosts", gamt->redir.host, 0) +1);
-	gamt_rebuild_hosts(gamt);
+	last = cfg_get_int("config", "hosts", gamt->redir.host, 0);
+	cfg_set_int("config", "hosts", gamt->redir.host, time(NULL));
+	if (!last)
+	    gamt_rebuild_hosts(gamt);
 	/* fall through */
     default:
 	snprintf(buf, sizeof(buf), "%s: %s", gamt->redir.host,
