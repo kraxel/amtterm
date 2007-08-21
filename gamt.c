@@ -1,3 +1,23 @@
+/*
+ *  amtterm -- Intel AMT serial-over-lan client, gtk version.
+ *
+ *  Copyright (C) 2007 Gerd Hoffmann <kraxel@redhat.com
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -302,6 +322,14 @@ static const GtkActionEntry entries[] = {
     }
 };
 
+static const GtkToggleActionEntry tentries[] = {
+    {
+	.name        = "BlinkCursor",
+	.label       = "blinking cursor",
+//	.callback    = G_CALLBACK(menu_cb_blink_cursor),
+    }
+};
+
 static char ui_xml[] =
 "<ui>\n"
 "  <menubar action='MainMenu'>\n"
@@ -517,6 +545,8 @@ static struct gamt_window *gamt_window()
     gamt->ui = gtk_ui_manager_new();
     gamt->ag = gtk_action_group_new("MenuActions");
     gtk_action_group_add_actions(gamt->ag, entries, G_N_ELEMENTS(entries), gamt);
+    gtk_action_group_add_toggle_actions(gamt->ag, tentries,
+					G_N_ELEMENTS(tentries), gamt);
     gtk_ui_manager_insert_action_group(gamt->ui, gamt->ag, 0);
 #if 0
     GtkAccelGroup *accel = gtk_ui_manager_get_accel_group(gamt->ui);
@@ -536,9 +566,14 @@ static struct gamt_window *gamt_window()
     g_signal_connect(gamt->vte, "commit", G_CALLBACK(user_input), gamt);
     vte_terminal_set_scrollback_lines(VTE_TERMINAL(gamt->vte), 4096);
     str = cfg_get_str(CFG_FONT);
-    if (str)
-	vte_terminal_set_font_from_string(VTE_TERMINAL(gamt->vte), str);
+    vte_terminal_set_font_from_string(VTE_TERMINAL(gamt->vte), str);
 
+    /* FIXME: make configurable */
+    vte_terminal_set_backspace_binding(VTE_TERMINAL(gamt->vte),
+				       VTE_ERASE_ASCII_BACKSPACE);
+    vte_terminal_set_delete_binding(VTE_TERMINAL(gamt->vte),
+				    VTE_ERASE_AUTO);
+    
     /* other widgets */
     gamt->status = gtk_label_new("idle");
     gtk_misc_set_alignment(GTK_MISC(gamt->status), 0, 0.5);
