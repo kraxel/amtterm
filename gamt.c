@@ -70,6 +70,7 @@ static void gamt_rebuild_hosts(struct gamt_window *gamt);
 #define CFG_FONT          CFG_SECTION, "font"
 #define CFG_FOREGROUND    CFG_SECTION, "foreground"
 #define CFG_BACKGROUND    CFG_SECTION, "background"
+#define CFG_BLINK         CFG_SECTION, "blink-cursor"
 
 /* ------------------------------------------------------------------ */
 
@@ -187,6 +188,16 @@ static void menu_cb_config_bg(GtkAction *action, void *data)
     cfg_set_str(CFG_BACKGROUND, name);
 }
 
+static void menu_cb_blink_cursor(GtkToggleAction *action, gpointer user_data)
+{
+    struct gamt_window *gamt = user_data;
+    gboolean state = gtk_toggle_action_get_active(action);
+
+    fprintf(stderr, "%s: %s\n", __FUNCTION__, state ? "on" : "off");
+    cfg_set_bool(CFG_BLINK, state);
+    vte_terminal_set_cursor_blinks(VTE_TERMINAL(gamt->vte), state);
+}
+
 static void menu_cb_quit(GtkAction *action, void *data)
 {
     struct gamt_window *gamt = data;
@@ -198,6 +209,7 @@ static void menu_cb_about(GtkAction *action, void *data)
 {
     static char *comments = "Intel AMT serial-over-lan client";
     static char *copyright = "(c) 2007 Gerd Hoffmann";
+    static char *website = "http://dl.bytesex.org/releases/amtterm/";
     static char *authors[] = { "Gerd Hoffmann <kraxel@redhat.com>", NULL };
     struct gamt_window *gamt = data;
 
@@ -207,6 +219,8 @@ static void menu_cb_about(GtkAction *action, void *data)
                           "copyright",       copyright,
                           "logo-icon-name",  GTK_STOCK_ABOUT,
                           "version",         VERSION,
+			  "website",         website,
+//			  "license",         "GPLv2+",
                           NULL);
 }
 
@@ -325,8 +339,8 @@ static const GtkActionEntry entries[] = {
 static const GtkToggleActionEntry tentries[] = {
     {
 	.name        = "BlinkCursor",
-	.label       = "blinking cursor",
-//	.callback    = G_CALLBACK(menu_cb_blink_cursor),
+	.label       = "Blinking cursor",
+	.callback    = G_CALLBACK(menu_cb_blink_cursor),
     }
 };
 
@@ -345,6 +359,8 @@ static char ui_xml[] =
 "      <menuitem action='VteFont'/>\n"
 "      <menuitem action='VteForeground'/>\n"
 "      <menuitem action='VteBackground'/>\n"
+"      <separator/>\n"
+"      <menuitem action='BlinkCursor'/>\n"
 "    </menu>\n"
 "    <menu action='HelpMenu'>\n"
 "      <menuitem action='About'/>\n"
@@ -528,6 +544,7 @@ static struct gamt_window *gamt_window()
     GtkWidget *vbox, *frame, *item;
     GdkColor color;
     GError *err;
+    gboolean state;
     struct gamt_window *gamt;
     char *str;
     
@@ -573,6 +590,11 @@ static struct gamt_window *gamt_window()
 				       VTE_ERASE_ASCII_BACKSPACE);
     vte_terminal_set_delete_binding(VTE_TERMINAL(gamt->vte),
 				    VTE_ERASE_AUTO);
+
+    item = gtk_ui_manager_get_widget(gamt->ui, "/MainMenu/ConfigMenu/BlinkCursor");
+    state = cfg_get_bool(CFG_BLINK, 0);
+    gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(item), state);
+    vte_terminal_set_cursor_blinks(VTE_TERMINAL(gamt->vte), state);
     
     /* other widgets */
     gamt->status = gtk_label_new("idle");
