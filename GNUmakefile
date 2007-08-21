@@ -8,6 +8,7 @@ CFLAGS	+= -Wall -Wno-pointer-sign
 CFLAGS	+= -DVERSION='"$(VERSION)"'
 
 TARGETS	:= amtterm
+DESKTOP := $(wildcard *.desktop)
 
 all: build
 
@@ -39,9 +40,10 @@ LDLIBS += $(shell test "$(pkglst)" != "" && pkg-config --libs   $(pkglst))
 build: $(TARGETS)
 
 install: build
-	mkdir -p $(bindir)
-	install -s $(TARGETS) $(bindir)
-	install amttool $(bindir)
+	$(INSTALL_DIR) $(bindir) $(appdir)
+	$(INSTALL_BINARY) $(TARGETS) $(bindir)
+	$(INSTALL_SCRIPT) amttool $(bindir)
+	$(INSTALL_DATA) $(DESKTOP) $(appdir)
 
 clean:
 	rm -f *.o *~

@@ -257,6 +257,8 @@ int redir_sol_recv(struct redir *r)
     len -= count;
 
     while (len) {
+	if (r->trace)
+	    fprintf(stderr, "in+: need %d more data bytes\n", len);
 	count = sizeof(msg);
 	if (count > len)
 	    count = len;
@@ -284,14 +286,24 @@ int redir_data(struct redir *r)
 {
     int rc, bshift;
 
+    if (r->trace) {
+	fprintf(stderr, "in --\n");
+	if (r->blen)
+	    fprintf(stderr, "in : already have %d\n", r->blen);
+    }
     rc = read(r->sock, r->buf + r->blen, sizeof(r->buf) - r->blen);
-    if (rc <= 0) {
+    switch (rc) {
+    case -1:
 	perror("read(sock)");
 	goto err;
+    case 0:
+	fprintf(stderr, "EOF from socket\n");
+	goto err;
+    default:
+	if (r->trace)
+	    hexdump("in ", r->buf + r->blen, rc);
+	r->blen += rc;
     }
-    if (r->trace)
-	hexdump("in ", r->buf + r->blen, rc);
-    r->blen += rc;
 
     for (;;) {
 	if (r->blen < 4)
@@ -344,6 +356,8 @@ int redir_data(struct redir *r)
 	    }
 	    break;
 	case SOL_DATA_FROM_HOST:
+	    if (r->blen < 10) /* header length */
+		goto again;
 	    bshift = redir_sol_recv(r);
 	    if (bshift < 0)
 		goto err;
@@ -365,6 +379,8 @@ int redir_data(struct redir *r)
 	}
 
 	/* have more data, shift by bshift */
+	if (r->trace)
+	    fprintf(stderr, "in : shift by %d\n", bshift);
 	memmove(r->buf, r->buf + bshift, r->blen - bshift);
 	r->blen -= bshift;
     }
@@ -372,9 +388,13 @@ int redir_data(struct redir *r)
 
 again:
     /* need more data, jump back into poll/select loop */
+    if (r->trace)
+	fprintf(stderr, "in : need more data\n");
     return 0;
 
 err:
+    if (r->trace)
+	fprintf(stderr, "in : ERROR\n");
     redir_state(r, REDIR_ERROR);
     close(r->sock);
     return -1;

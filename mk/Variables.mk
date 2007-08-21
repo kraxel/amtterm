@@ -6,8 +6,11 @@ DESTDIR	=
 srcdir	?= .
 prefix	?= /usr/local
 bindir	=  $(DESTDIR)$(prefix)/bin
-mandir	=  $(DESTDIR)$(prefix)/share/man
-locdir  =  $(DESTDIR)$(prefix)/share/locale
+libdir  =  $(DESTDIR)$(prefix)/$(LIB)
+shrdir  =  $(DESTDIR)$(prefix)/share
+mandir	=  $(shrdir)/man
+locdir  =  $(shrdir)/locale
+appdir  =  $(shrdir)/applications
 
 # package + version
 empty	:=
