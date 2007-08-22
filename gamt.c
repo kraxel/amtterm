@@ -249,8 +249,8 @@ static void state_gtk(void *cb_data, enum redir_state old, enum redir_state new)
 
     switch (new) {
     case REDIR_ERROR:
-	snprintf(buf, sizeof(buf), "%s: %s FAILED", gamt->redir.host,
-		 redir_state_desc(old));
+	snprintf(buf, sizeof(buf), "%s: %s FAILED (%s)", gamt->redir.host,
+		 redir_state_desc(old), gamt->redir.err);
 	if (old == REDIR_AUTH) {
 	    /* ask for a new password next time ... */
 	    strcpy(amt_pass, "");

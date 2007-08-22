@@ -46,16 +46,19 @@ static void state_tty(void *cb_data, enum redir_state old, enum redir_state new)
 {
     struct redir *r = cb_data;
 
-    if (!r->verbose)
-	return;
-
-    fprintf(stderr, APPNAME ": %s -> %s (%s)\n",
-	    redir_state_name(old), redir_state_name(new),
-	    redir_state_desc(new));
+    if (r->verbose)
+	fprintf(stderr, APPNAME ": %s -> %s (%s)\n",
+		redir_state_name(old), redir_state_name(new),
+		redir_state_desc(new));
     switch (new) {
     case REDIR_RUN_SOL:
-	fprintf(stderr, "serial-over-lan redirection ok\n");
-	fprintf(stderr, "connected now, use ^] to escape\n");
+	if (r->verbose)
+	    fprintf(stderr,
+		    "serial-over-lan redirection ok\n"
+		    "connected now, use ^] to escape\n");
+	break;
+    case REDIR_ERROR:
+	fprintf(stderr, APPNAME ": ERROR: %s\n", r->err);
 	break;
     default:
 	break;

@@ -26,6 +26,7 @@ struct redir {
     int               verbose;
     int               trace;
     enum redir_state  state;
+    unsigned char     err[128]; // state == REDIR_ERROR
 
     int               sock;
     unsigned char     buf[64];

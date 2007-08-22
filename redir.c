@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 
 #include "tcp.h"
 #include "redir.h"
@@ -90,9 +91,14 @@ static void hexdump(const char *prefix, const unsigned char *data, size_t size)
 
 static ssize_t redir_write(struct redir *r, const char *buf, size_t count)
 {
+    int rc;
+    
     if (r->trace)
 	hexdump("out", buf, count);
-    return write(r->sock, buf, count);
+    rc = write(r->sock, buf, count);
+    if (-1 == rc)
+	snprintf(r->err, sizeof(r->err), "write(socket): %s", strerror(errno));
+    return rc;
 }
 
 static void redir_state(struct redir *r, enum redir_state new)
@@ -265,10 +271,10 @@ int redir_sol_recv(struct redir *r)
 	count = read(r->sock, msg, count);
 	switch (count) {
 	case -1:
-	    perror("read(sock)");
+	    snprintf(r->err, sizeof(r->err), "read(socket): %s", strerror(errno));
 	    return -1;
 	case 0:
-	    fprintf(stderr, "EOF from socket\n");
+	    snprintf(r->err, sizeof(r->err), "EOF from socket");
 	    return -1;
 	default:
 	    if (r->trace)
@@ -294,10 +300,10 @@ int redir_data(struct redir *r)
     rc = read(r->sock, r->buf + r->blen, sizeof(r->buf) - r->blen);
     switch (rc) {
     case -1:
-	perror("read(sock)");
+	snprintf(r->err, sizeof(r->err), "read(socket): %s", strerror(errno));
 	goto err;
     case 0:
-	fprintf(stderr, "EOF from socket\n");
+	snprintf(r->err, sizeof(r->err), "EOF from socket");
 	goto err;
     default:
 	if (r->trace)
@@ -316,7 +322,7 @@ int redir_data(struct redir *r)
 	    if (r->blen < bshift)
 		goto again;
 	    if (r->buf[1] != STATUS_SUCCESS) {
-		fprintf(stderr, "redirection session start failed\n");
+		snprintf(r->err, sizeof(r->err), "redirection session start failed");
 		goto err;
 	    }
 	    if (-1 == redir_auth(r))
@@ -327,7 +333,7 @@ int redir_data(struct redir *r)
 	    if (r->blen < bshift)
 		goto again;
 	    if (r->buf[1] != STATUS_SUCCESS) {
-		fprintf(stderr, "session authentication failed\n");
+		snprintf(r->err, sizeof(r->err), "session authentication failed");
 		goto err;
 	    }
 	    if (-1 == redir_sol_start(r))
@@ -338,7 +344,7 @@ int redir_data(struct redir *r)
 	    if (r->blen < bshift)
 		goto again;
 	    if (r->buf[1] != STATUS_SUCCESS) {
-		fprintf(stderr, "serial-over-lan redirection failed\n");
+		snprintf(r->err, sizeof(r->err), "serial-over-lan redirection failed");
 		goto err;
 	    }
 	    redir_state(r, REDIR_RUN_SOL);
@@ -350,10 +356,8 @@ int redir_data(struct redir *r)
 	    bshift = HEARTBEAT_LENGTH;
 	    if (r->blen < bshift)
 		goto again;
-	    if (HEARTBEAT_LENGTH != redir_write(r, r->buf, HEARTBEAT_LENGTH)) {
-		perror("write(sock)");
+	    if (HEARTBEAT_LENGTH != redir_write(r, r->buf, HEARTBEAT_LENGTH))
 		goto err;
-	    }
 	    break;
 	case SOL_DATA_FROM_HOST:
 	    if (r->blen < 10) /* header length */
@@ -369,7 +373,8 @@ int redir_data(struct redir *r)
 	    redir_stop(r);
 	    break;
 	default:
-	    fprintf(stderr, "%s: unknown r->buf 0x%02x\n", __FUNCTION__, r->buf[0]);
+	    snprintf(r->err, sizeof(r->err), "%s: unknown r->buf 0x%02x",
+		     __FUNCTION__, r->buf[0]);
 	    goto err;
 	}
 
@@ -394,7 +399,7 @@ again:
 
 err:
     if (r->trace)
-	fprintf(stderr, "in : ERROR\n");
+	fprintf(stderr, "in : ERROR (%s)\n", r->err);
     redir_state(r, REDIR_ERROR);
     close(r->sock);
     return -1;
