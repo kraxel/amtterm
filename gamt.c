@@ -128,12 +128,15 @@ static void menu_cb_config_font(GtkAction *action, void *data)
     fontname = cfg_get_str(CFG_FONT);
     gtk_font_selection_dialog_set_font_name
 	(GTK_FONT_SELECTION_DIALOG(dialog), fontname);
+
     gtk_widget_show_all(dialog);
-    if (GTK_RESPONSE_OK == gtk_dialog_run(GTK_DIALOG(dialog))) {
+    switch (gtk_dialog_run(GTK_DIALOG(dialog))) {
+    case GTK_RESPONSE_OK:
 	fontname = gtk_font_selection_dialog_get_font_name
 	    (GTK_FONT_SELECTION_DIALOG(dialog));
 	vte_terminal_set_font_from_string(VTE_TERMINAL(gamt->vte), fontname);
 	cfg_set_str(CFG_FONT, fontname);
+	break;
     }
     gtk_widget_destroy(dialog);
 }
@@ -150,7 +153,8 @@ static int pickcolor(char *title, GdkColor *color)
     gtk_color_selection_set_current_color(csel, color);
     
     gtk_widget_show_all(dialog);
-    if (GTK_RESPONSE_OK == gtk_dialog_run(GTK_DIALOG(dialog))) {
+    switch (gtk_dialog_run(GTK_DIALOG(dialog))) {
+    case GTK_RESPONSE_OK:
 	gtk_color_selection_get_current_color(csel, color);
 	rc = 0;
     }
