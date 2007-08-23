@@ -43,6 +43,7 @@ struct gamt_window {
     GtkWidget      *win;
     GtkWidget      *vte;
     GtkWidget      *status;
+    GtkWidget      *icon;
 
     GtkActionGroup *hosts_ag;
     guint          hosts_id;
@@ -51,6 +52,24 @@ struct gamt_window {
     struct redir   redir;
     GIOChannel     *ch;
     guint          id;
+};
+
+static const char *state_stock[] = {
+    [ REDIR_NONE      ] = GTK_STOCK_DISCONNECT,
+#if 0
+    [ REDIR_CONNECT   ] = GTK_STOCK_,
+    [ REDIR_INIT      ] = GTK_STOCK_,
+    [ REDIR_AUTH      ] = GTK_STOCK_,
+    [ REDIR_INIT_SOL  ] = GTK_STOCK_,
+#endif
+    [ REDIR_RUN_SOL   ] = GTK_STOCK_CONNECT,
+#if 0
+    [ REDIR_INIT_IDER ] = GTK_STOCK_,
+    [ REDIR_RUN_IDER  ] = GTK_STOCK_,
+    [ REDIR_CLOSING   ] = GTK_STOCK_,
+#endif
+    [ REDIR_CLOSED    ] = GTK_STOCK_DISCONNECT,
+    [ REDIR_ERROR     ] = GTK_STOCK_DISCONNECT,
 };
 
 static char amt_host[64];
@@ -271,6 +290,9 @@ static void state_gtk(void *cb_data, enum redir_state old, enum redir_state new)
 		 redir_state_desc(new));
 	break;
     }
+    if (state_stock[new])
+	gtk_image_set_from_stock(GTK_IMAGE(gamt->icon), state_stock[new],
+				 GTK_ICON_SIZE_SMALL_TOOLBAR);
     gtk_label_set_text(GTK_LABEL(gamt->status), buf);
 }
 
@@ -324,6 +346,7 @@ static const GtkActionEntry entries[] = {
 	.callback    = G_CALLBACK(menu_cb_config_font),
     },{
 	.name        = "VteForeground",
+//	.stock_id    = GTK_STOCK_SELECT_COLOR,
 	.label       = "_Text Color ...",
 	.callback    = G_CALLBACK(menu_cb_config_fg),
     },{
@@ -545,7 +568,7 @@ static int gamt_connect(struct gamt_window *gamt)
 
 static struct gamt_window *gamt_window()
 {
-    GtkWidget *vbox, *frame, *item;
+    GtkWidget *vbox, *hbox, *frame, *item;
     GdkColor color;
     GError *err;
     gboolean state;
@@ -604,9 +627,12 @@ static struct gamt_window *gamt_window()
     gamt->status = gtk_label_new("idle");
     gtk_misc_set_alignment(GTK_MISC(gamt->status), 0, 0.5);
     gtk_misc_set_padding(GTK_MISC(gamt->status), 3, 1);
-
+    gamt->icon = gtk_image_new_from_stock(GTK_STOCK_DISCONNECT,
+					  GTK_ICON_SIZE_SMALL_TOOLBAR);
+    
     /* Make a vbox and put stuff in */
     vbox = gtk_vbox_new(FALSE, 1);
+    hbox = gtk_hbox_new(FALSE, 1);
     gtk_container_set_border_width(GTK_CONTAINER(vbox), 1);
     gtk_container_add(GTK_CONTAINER(gamt->win), vbox);
     item = gtk_ui_manager_get_widget(gamt->ui, "/MainMenu");
@@ -616,10 +642,15 @@ static struct gamt_window *gamt_window()
     gtk_box_pack_start(GTK_BOX(vbox), item, FALSE, FALSE, 0);
 #endif
     gtk_box_pack_start(GTK_BOX(vbox), gamt->vte, TRUE, TRUE, 0);
+    gtk_box_pack_end(GTK_BOX(vbox), hbox, FALSE, TRUE, 0);
 
     frame = gtk_frame_new(NULL);
-    gtk_box_pack_end(GTK_BOX(vbox), frame, FALSE, TRUE, 0);
     gtk_container_add(GTK_CONTAINER(frame), gamt->status);
+    gtk_box_pack_start(GTK_BOX(hbox), frame, TRUE, TRUE, 0);
+
+    frame = gtk_frame_new(NULL);
+    gtk_container_add(GTK_CONTAINER(frame), gamt->icon);
+    gtk_box_pack_end(GTK_BOX(hbox), frame, FALSE, TRUE, 0);
 
     /* display window */
     gtk_widget_show_all(gamt->win);
