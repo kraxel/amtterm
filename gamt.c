@@ -28,6 +28,8 @@
 #include <signal.h>
 #include <ctype.h>
 
+#include <gdk/gdk.h>
+#include <gdk/gdkx.h>
 #include <gtk/gtk.h>
 #include <vte/vte.h>
 
@@ -77,6 +79,7 @@ static char amt_port[16];
 static char amt_user[32] = "admin";
 static char amt_pass[32];
 static int amt_trace;
+static int amt_debug;
 
 static int gamt_getstring(GtkWidget *window, char *title, char *message,
 			  char *dest, int dlen, int hide);
@@ -216,7 +219,8 @@ static void menu_cb_blink_cursor(GtkToggleAction *action, gpointer user_data)
     struct gamt_window *gamt = user_data;
     gboolean state = gtk_toggle_action_get_active(action);
 
-    fprintf(stderr, "%s: %s\n", __FUNCTION__, state ? "on" : "off");
+    if (amt_debug)
+	fprintf(stderr, "%s: %s\n", __FUNCTION__, state ? "on" : "off");
     cfg_set_bool(CFG_BLINK, state);
     vte_terminal_set_cursor_blinks(VTE_TERMINAL(gamt->vte), state);
 }
@@ -226,6 +230,45 @@ static void menu_cb_quit(GtkAction *action, void *data)
     struct gamt_window *gamt = data;
 
     gtk_widget_destroy(gamt->win);
+}
+
+static void show_manpage(char *page, char *section)
+{
+    char buf[64];
+
+
+    switch(fork()) {
+    case -1:
+	perror("fork");
+	break;
+    case 0:
+	/* child: try xdg-open first ... */
+	snprintf(buf, sizeof(buf), "man:%s(%s)", page, section);
+	execlp("xdg-open", "xdg-open", buf, NULL);
+	perror("execlp(xdg-open)");
+	/* ... fallback is an xterm with man */
+	snprintf(buf, sizeof(buf), "manual page: %s(%s)", page, section);
+	execlp("xterm", "xterm",
+	       "-title", buf, 
+	       "-e", "man", section, page,
+	       NULL);
+	perror("execlp(xterm)");
+	exit(1);
+	break;
+    default:
+	/* parent */
+	break;
+    }
+}
+
+static void menu_cb_man_gamt(GtkAction *action, void *data)
+{
+    show_manpage("gamt", "1");
+}
+
+static void menu_cb_man_amt_howto(GtkAction *action, void *data)
+{
+    show_manpage("amt-howto", "7");
 }
 
 static void menu_cb_about(GtkAction *action, void *data)
@@ -272,8 +315,13 @@ static void state_gtk(void *cb_data, enum redir_state old, enum redir_state new)
 
     switch (new) {
     case REDIR_ERROR:
+#if 0
 	snprintf(buf, sizeof(buf), "%s: %s FAILED (%s)", gamt->redir.host,
 		 redir_state_desc(old), gamt->redir.err);
+#else
+	snprintf(buf, sizeof(buf), "%s: ERROR: %s", gamt->redir.host,
+		 gamt->redir.err);
+#endif
 	if (old == REDIR_AUTH) {
 	    /* ask for a new password next time ... */
 	    strcpy(amt_pass, "");
@@ -356,6 +404,16 @@ static const GtkActionEntry entries[] = {
     },{
 
 	/* Help menu */
+	.name        = "ManGamt1",
+	.stock_id    = GTK_STOCK_HELP,
+	.label       = "Manual Page",
+	.callback    = G_CALLBACK(menu_cb_man_gamt),
+    },{
+	.name        = "ManAmtHowto7",
+	.stock_id    = GTK_STOCK_INFO,
+	.label       = "AMT HowTo",
+	.callback    = G_CALLBACK(menu_cb_man_amt_howto),
+    },{
 	.name        = "About",
 	.stock_id    = GTK_STOCK_ABOUT,
 	.label       = "_About ...",
@@ -390,6 +448,9 @@ static char ui_xml[] =
 "      <menuitem action='BlinkCursor'/>\n"
 "    </menu>\n"
 "    <menu action='HelpMenu'>\n"
+"      <menuitem action='ManGamt1'/>\n"
+"      <menuitem action='ManAmtHowto7'/>\n"
+"      <separator/>\n"
 "      <menuitem action='About'/>\n"
 "    </menu>\n"
 "  </menubar>\n"
@@ -559,6 +620,7 @@ static int gamt_connect(struct gamt_window *gamt)
     if (-1 == redir_connect(&gamt->redir))
 	return -1;
 
+    fcntl(gamt->redir.sock, F_SETFD, FD_CLOEXEC);
     vte_terminal_reset(VTE_TERMINAL(gamt->vte), TRUE, TRUE);
     gamt->ch = g_io_channel_unix_new(gamt->redir.sock);
     gamt->id = g_io_add_watch(gamt->ch, G_IO_IN, gamt_data, gamt);
@@ -698,10 +760,10 @@ static void usage(FILE *fp)
 int
 main(int argc, char *argv[])
 {
+    Display *dpy;
     struct gamt_window *gamt;
     char configfile[256];
     char *h;
-    int debug = 0;
     int c;
 
     if (NULL != (h = getenv("AMT_PASSWORD")))
@@ -718,12 +780,15 @@ main(int argc, char *argv[])
 	cfg_set_str(CFG_BACKGROUND, "black");
 
     gtk_init(&argc, &argv);
+    dpy = gdk_x11_display_get_xdisplay(gdk_display_get_default());
+    fcntl(ConnectionNumber(dpy),F_SETFD,FD_CLOEXEC);
+
     for (;;) {
         if (-1 == (c = getopt(argc, argv, "hdtu:p:f:c:b:")))
             break;
         switch (c) {
 	case 'd':
-	    debug++;
+	    amt_debug++;
 	    break;
 	case 't':
 	    amt_trace++;
