@@ -1,0 +1,46 @@
+.TH amttool 1 "(c) 2007 Gerd Hoffmann"
+.SH NAME
+amttool - remotely control Intel AMT managed machines.
+.SH SYNOPSIS
+.B amttool host [ command ]
+.SH DESCRIPTION
+.B amttool
+is a perl script which speaks SOAP to Intel AMT managed machines.
+It can query informations about the machine in question and also
+send some commands for basic remote control.
+.P
+.B host
+is the hostname or IP address of the machine amttool should
+control.
+.B command
+is an optional command.
+.P
+You must set fill AMT_PASSWORD environment variable with the AMT
+password.
+.P
+For more inforamtions on Intel AMT check amt-howto(7).
+.SH COMMANDS
+.TP
+.B info
+gather information (default).
+.TP
+.B reset
+reset machine.
+.TP
+.B powerup
+turn on machine.
+.TP
+.B powerdown
+turn off machine.
+.TP
+.B powercycle
+powercycle machine.
+.SH ENVIRONMENT
+.TP
+.B AMT_PASSWORD
+AMT password.
+.SH SEE ALSO
+amtterm(1), gamt(1), amt-howto(7)
+.SH AUTHOR
+(c) 2007 Gerd Hoffmann <kraxel@redhat.com>
+

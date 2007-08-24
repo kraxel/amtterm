@@ -12,7 +12,7 @@ $main::amt_pass = $ENV{'AMT_PASSWORD'};
 my $amt_command = shift;
 $amt_command = "info" if !defined($amt_command);
 
-#########################################################################################
+#############################################################################
 # data
 
 my @ps = ("S0", "S1", "S2", "S3", "S4", "S5 (soft-off)", "S4/S5", "Off");
@@ -35,7 +35,7 @@ my %pt_status = (
 );
 
 
-#########################################################################################
+#############################################################################
 # soap setup
 
 my ($nas, $sas, $rcs);
@@ -57,11 +57,14 @@ sub soap_init() {
 	$rcs = SOAP::Lite->new(
 		proxy      => "$proxybase/RemoteControlService",
 		default_ns => "$schemabase/RemoteControl/2004/01");
+
+	$nas->autotype(0);
+	$sas->autotype(0);
 	$rcs->autotype(0);
 }
 
 
-#########################################################################################
+#############################################################################
 # functions
 
 sub usage() {
@@ -82,7 +85,57 @@ Password is passed via AMT_PASSWORD environment variable.
 EOF
 }
 
-sub print_info() {
+sub print_result($) {
+	my $ret = shift;
+	my $rc = $ret->result;
+	my $msg;
+
+	if (!defined($rc)) {
+		$msg = "soap failure";
+	} elsif (!defined($pt_status{$rc})) {
+		$msg = "unknown pt_status code: " . $rc;
+	} else {
+		$msg = "pt_status: " . $pt_status{$rc};
+	}
+	printf "result: %s\n", $msg;
+}
+
+sub print_paramsout($) {
+	my $ret = shift;
+	my @paramsout = $ret->paramsout;
+	print "params: " . join(", ", @paramsout) . "\n";
+}
+
+sub print_hash {
+	my $hash = shift;
+	my $in = shift;
+	my $wi = shift;
+
+	foreach my $item (sort keys %{$hash}) {
+		if (ref($hash->{$item}) eq "HASH") {
+#			printf "%*s%s\n", $in, "", $item;
+			next;
+		}
+		printf "%*s%-*s%s\n", $in, "", $wi, $item, $hash->{$item};
+	}
+}
+
+sub print_hash_ipv4 {
+	my $hash = shift;
+	my $in = shift;
+	my $wi = shift;
+
+	foreach my $item (sort keys %{$hash}) {
+		my $addr = sprintf("%d.%d.%d.%d",
+			$hash->{$item} / 256 / 256 / 256,
+			$hash->{$item} / 256 / 256 % 256,
+			$hash->{$item} / 256 % 256,
+			$hash->{$item} % 256);
+		printf "%*s%-*s%s\n", $in, "", $wi, $item, $addr;
+	}
+}
+
+sub print_general_info() {
 	printf "### AMT info on machine '%s' ###\n", $amt_host;
 
 	my $amt_version = $sas->GetCoreVersion()->paramsout;
@@ -91,34 +144,51 @@ sub print_info() {
 	my $hostname = $nas->GetHostName()->paramsout;
 	my $domainname = $nas->GetDomainName()->paramsout;
 	printf "Hostname:     %s.%s\n", $hostname, $domainname;
-	
+
 	my $powerstate = $rcs->GetSystemPowerState()->paramsout;
 	printf "Powerstate:   %s\n", $ps [ $powerstate & 0x0f ];
+}
 	
+sub print_remote_info() {
 	my @rccaps = $rcs->GetRemoteControlCapabilities()->paramsout;
-	printf "Remote Capabilities:\n";
-	printf "   IanaOemNumber                %x\n", $rccaps[0];
-	printf "   OemDefinedCapabilities       %s%s%s%s%s\n",
+	printf "Remote Control Capabilities:\n";
+	printf "    IanaOemNumber                   %x\n", $rccaps[0];
+	printf "    OemDefinedCapabilities          %s%s%s%s%s\n",
 		$rccaps[1] & 0x01 ? "IDER "        : "",
 		$rccaps[1] & 0x02 ? "SOL "         : "",
 		$rccaps[1] & 0x04 ? "BiosReflash " : "",
 		$rccaps[1] & 0x08 ? "BiosSetup "   : "",
 		$rccaps[1] & 0x10 ? "BiosPause "   : "";
 
-	printf "   SpecialCommandsSupported     %s%s%s%s%s\n",
+	printf "    SpecialCommandsSupported        %s%s%s%s%s\n",
 		$rccaps[2] & 0x0100 ? "PXE-boot "         : "",
 		$rccaps[2] & 0x0200 ? "HD-boot "          : "",
 		$rccaps[2] & 0x0400 ? "HD-boot-safemode " : "",
 		$rccaps[2] & 0x0800 ? "diag-boot "        : "",
 		$rccaps[2] & 0x1000 ? "cd-boot "          : "";
 
-	printf "   SystemCapabilitiesSupported  %s%s%s%s\n",
+	printf "    SystemCapabilitiesSupported     %s%s%s%s\n",
 		$rccaps[3] & 0x01 ? "powercycle " : "",
 		$rccaps[3] & 0x02 ? "powerdown "  : "",
 		$rccaps[3] & 0x03 ? "powerup "    : "",
 		$rccaps[3] & 0x04 ? "reset "      : "";
 
-	printf "   SystemFirmwareCapabilities   %x\n", $rccaps[4];
+	printf "    SystemFirmwareCapabilities      %x\n", $rccaps[4];
+}
+
+sub print_network_info() {
+	my $ret;
+
+	$ret = $nas->EnumerateInterfaces();
+	my @if = $ret->paramsout;
+	foreach my $if (@if) {
+		printf "Network Interface %s:\n", $if;
+		my $arg = SOAP::Data->name('InterfaceHandle' => $if);
+		$ret = $nas->GetInterfaceSettings($arg);
+		my $desc = $ret->paramsout;
+		print_hash($ret->paramsout, 4, 32);
+		print_hash_ipv4($ret->paramsout->{'IPv4Parameters'}, 8, 28);
+	}
 }
 
 sub remote_control($) {
@@ -132,23 +202,15 @@ sub remote_control($) {
 		printf "execute: %s\n", $command;
 		my $arg1 = SOAP::Data->name('Command' => $rcc{$command});
 		my $arg2 = SOAP::Data->name('IanaOemNumber' => 4542);
-		my $rc = $rcs->RemoteControl($arg1, $arg2)->result;
-		my $msg;
-		if (!defined($rc)) {
-			$msg = "soap failure";
-		} elsif (!defined($pt_status{$rc})) {
-			$msg = "unknown pt_status code: " . $rc;
-		} else {
-			$msg = "pt_status: " . $pt_status{$rc};
-		}
-		printf "result: %s\n", $msg;
+		my $ret = $rcs->RemoteControl($arg1, $arg2);
+		print_result($ret);
 	} else {
 		printf "canceled\n";
 	}
 }
 
 
-#########################################################################################
+#############################################################################
 # main
 
 if (!defined($amt_host)) {
@@ -159,9 +221,12 @@ if (!defined($amt_host)) {
 soap_init;
 
 if ($amt_command eq "info") {
-	print_info;
+	print_general_info;
+	print_remote_info;
+	print_network_info;
 } elsif ($amt_command =~ m/^(reset|powerup|powerdown|powercycle)$/) {
 	remote_control($amt_command);
 } else {
 	print "unknown command: $amt_command\n";
 }
+
