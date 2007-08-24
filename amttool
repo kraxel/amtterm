@@ -23,6 +23,17 @@ my %rcc = (
 	"powercycle" => "19",
 );
 
+# incomplete list
+my %pt_status = (
+	0x00 => "success",
+	0x01 => "internal error",
+	0x03 => "invalid pt mode",
+	0x0c => "invalid name",
+	0x0f => "invalid byte count",
+	0x10 => "not permitted",
+	0x17 => "max limit reached",
+);
+
 
 #########################################################################################
 # soap setup
@@ -122,7 +133,15 @@ sub remote_control($) {
 		my $arg1 = SOAP::Data->name('Command' => $rcc{$command});
 		my $arg2 = SOAP::Data->name('IanaOemNumber' => 4542);
 		my $rc = $rcs->RemoteControl($arg1, $arg2)->result;
-		printf "result: %s\n", defined($rc) ? $rc : "failed";
+		my $msg;
+		if (!defined($rc)) {
+			$msg = "soap failure";
+		} elsif (!defined($pt_status{$rc})) {
+			$msg = "unknown pt_status code: " . $rc;
+		} else {
+			$msg = "pt_status: " . $pt_status{$rc};
+		}
+		printf "result: %s\n", $msg;
 	} else {
 		printf "canceled\n";
 	}
