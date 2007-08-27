@@ -35,12 +35,38 @@ turn off machine.
 .TP
 .B powercycle
 powercycle machine.
+.TP
+.B netinfo
+print network configuration (requires AMT 2.5+).
+.TP
+.B netconf if link [ ip mask gw [ dns1 [ dns2 ]]]
+configure network interface (requires AMT 2.5+).
+.B if
+is the interface handle,
+.B link
+the link policy.  If in doubt just feed in what the netinfo command
+prints.
+.B ip
+is the IPv4 address,
+.B mask
+the netmask,
+.B gw
+the default gateway,
+.B dns1
+and
+.B dns2
+are the DNS Servers.  If no IP configuration is specified the tool
+tries to configure the machine in shared mac address mode with dhcp,
+otherwise in separate mac address mode with static IP address.
+Default for dns1 is the gateway address, for dns2 it is 0.0.0.0.
 .SH ENVIRONMENT
 .TP
 .B AMT_PASSWORD
 AMT password.
+.TP
+.B AMT_DEBUG
+Enable debug output.
 .SH SEE ALSO
 amtterm(1), gamt(1), amt-howto(7)
 .SH AUTHOR
 (c) 2007 Gerd Hoffmann <kraxel@redhat.com>
-

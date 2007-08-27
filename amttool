@@ -8,7 +8,8 @@ my $amt_host = shift;
 my $amt_port = "16992";
 $main::amt_user = "admin";
 $main::amt_pass = $ENV{'AMT_PASSWORD'};
-my $amt_debug = 1;
+my $amt_debug = 0;
+$amt_debug = $ENV{'AMT_DEBUG'} if defined($ENV{'AMT_DEBUG'});
 
 my $amt_command = shift;
 $amt_command = "info" if !defined($amt_command);
@@ -113,11 +114,15 @@ This utility can talk to Intel AMT managed machines.
 
 usage: amttool <hostname> [ <command> ]
 commands:
-   info        - print some machine info (default).
-   reset       - reset machine.
-   powerup     - turn on machine.
-   powerdown   - turn off machine.
-   powercycle  - powercycle machine.
+   info            - print some machine info (default).
+   reset           - reset machine.
+   powerup         - turn on machine.
+   powerdown       - turn off machine.
+   powercycle      - powercycle machine.
+
+AMT 2.5+ only:
+   netinfo         - print network config.
+   netconf <args>  - configure network (check manpage).
 
 Password is passed via AMT_PASSWORD environment variable.
 
@@ -174,15 +179,26 @@ sub print_hash_ipv4 {
 	}
 }
 
-sub dump_request {
+sub do_soap {
 	my $soap = shift;
-	my $method = shift;
+	my $name = shift;
+	my @args = @_;
+	my $method;
 
-	print "-- \n";
-	open XML, "| xmllint --format -";
-	print XML $soap->serializer->envelope(method => $method, @_);
-	close XML;
-	print "-- \n";
+	$method = SOAP::Data->name($name)
+			    ->attr( { xmlns => $soap->ns } );
+
+	if ($amt_debug) {
+		print "-- \n";
+		open XML, "| xmllint --format -";
+		print XML $soap->serializer->envelope(method => $method, @_);
+		close XML;
+		print "-- \n";
+	}
+
+	my $ret = $soap->call($method, @args);
+	print_result($ret);
+	return $ret;
 }
 
 sub check_amt_version {
@@ -252,6 +268,7 @@ sub print_network_info() {
 
 sub remote_control($) {
 	my $command = shift;
+	my @args;
 
 	my $hostname = $nas->GetHostName()->paramsout;
 	my $domainname = $nas->GetDomainName()->paramsout;
@@ -259,10 +276,9 @@ sub remote_control($) {
 	my $reply = <>;
 	if ($reply =~ m/^(y|yes)$/i) {
 		printf "execute: %s\n", $command;
-		my $arg1 = SOAP::Data->name('Command' => $rcc{$command});
-		my $arg2 = SOAP::Data->name('IanaOemNumber' => 4542);
-		my $ret = $rcs->RemoteControl($arg1, $arg2);
-		print_result($ret);
+		push (@args, SOAP::Data->name('Command' => $rcc{$command}));
+		push (@args, SOAP::Data->name('IanaOemNumber' => 4542));
+		do_soap($rcs, "RemoteControl", @args);
 	} else {
 		printf "canceled\n";
 	}
@@ -298,7 +314,7 @@ sub configure_network {
 	my $method;
 	my @args;
 
-	# build args ...
+	# build argument structs ...
 	die "no interface" if !defined($if);
 	die "no linkpolicy" if !defined($link);
 	if (defined($ip)) {
@@ -323,18 +339,12 @@ sub configure_network {
 		\SOAP::Data->value(@ipv4)))
 			if @ipv4;
 
-	# perform call
-	$method = SOAP::Data->name("SetInterfaceSettings")
-			    ->attr( { xmlns => $nas->ns } );
 	push (@args, SOAP::Data->name("InterfaceHandle" => $if));
 	push (@args, SOAP::Data->name("InterfaceDescriptor" =>
 		\SOAP::Data->value(@ifdesc)));
 
-	dump_request($nas, $method, @args)
-		if $amt_debug;
-
-	my $ret = $nas->call($method, @args);
-	print_result($ret);
+	# perform call
+	do_soap($nas, "SetInterfaceSettings", @args);
 }
 
 
