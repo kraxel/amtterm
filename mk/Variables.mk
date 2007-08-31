@@ -26,8 +26,10 @@ RELTAG	:= v$(subst .,_,$(VERSION))
 CC		?= gcc
 CXX		?= g++
 MOC             ?= $(if $(QTDIR),$(QTDIR)/bin/moc,moc)
+
+STRIP		?= -s
 INSTALL		?= install
-INSTALL_BINARY  := $(INSTALL) -s
+INSTALL_BINARY  := $(INSTALL) $(STRIP)
 INSTALL_SCRIPT  := $(INSTALL)
 INSTALL_DATA	:= $(INSTALL) -m 644
 INSTALL_DIR	:= $(INSTALL) -d
