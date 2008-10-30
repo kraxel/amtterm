@@ -1,6 +1,6 @@
 .TH amt-howto 7 "(c) 2007 Gerd Hoffmann"
-.SH SYNOPSIS
-Intel AMT with linux mini howto
+.SH NAME
+amt-howto - Intel AMT with linux mini howto
 .SH DESCRIPTION
 
 .SS What is AMT and why I should care?
@@ -19,7 +19,7 @@ it too.
 .SS Documentation
 Look here for documentation beyond this mini howto:
 .br
-http://www.intel.com/technology/platform-technology/intel-amt/engage.htm
+http://www.intel.com/technology/platform-technology/intel-amt/
 .br
 Most useful to get started: "Intel AMT Deployment and Reference Guide"
 
@@ -93,7 +93,7 @@ see the boot messages (and kernel Oopses, if any).
 .P
 You can tell grub to use that serial device, so you can pick a working
 kernel for the next boot.  Usual commands from the grub manual, except
-that you need "--port=0xe000" instead of "--unit=0" due to the
+that you need "\-\-port=0xe000" instead of "\-\-unit=0" due to the
 non-standard I/O port for the serial line (my machine, yours might use
 another port, check linux kernel boot messages).
 .P
