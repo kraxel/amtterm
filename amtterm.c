@@ -69,7 +69,7 @@ static int redir_loop(struct redir *r)
 {
     unsigned char buf[BUFSIZE+1];
     struct timeval tv;
-    int rc;
+    int rc, i;
     fd_set set;
 
     for(;;) {
@@ -91,7 +91,7 @@ static int redir_loop(struct redir *r)
 	    fprintf(stderr,"select: timeout\n");
 	    return -1;
 	}
-	
+
 	if (FD_ISSET(0,&set)) {
 	    /* stdin has data */
 	    rc = read(0,buf,BUFSIZE);
@@ -107,6 +107,11 @@ static int redir_loop(struct redir *r)
 		    if (r->verbose)
 			fprintf(stderr, "\n" APPNAME ": saw ^], exiting\n");
 		    redir_sol_stop(r);
+                }
+                for (i = 0; i < rc; i++) {
+                    /* meet BIOS expectations */
+                    if (buf[i] == 0x0a)
+                        buf[i] = 0x0d;
 		}
 		if (-1 == redir_sol_send(r, buf, rc))
 		    return -1;
@@ -136,7 +141,7 @@ static void tty_save(void)
 static void tty_noecho(void)
 {
     struct termios tattr;
-    
+
     memcpy(&tattr,&saved_attributes,sizeof(struct termios));
     tattr.c_lflag &= ~(ECHO);
     tcsetattr (0, TCSAFLUSH, &tattr);
@@ -145,7 +150,7 @@ static void tty_noecho(void)
 static void tty_raw(void)
 {
     struct termios tattr;
-    
+
     fcntl(0,F_SETFL,O_NONBLOCK);
     memcpy(&tattr,&saved_attributes,sizeof(struct termios));
     tattr.c_lflag &= ~(ISIG|ICANON|ECHO);
@@ -260,6 +265,6 @@ int main(int argc, char *argv[])
     redir_start(&r);
     redir_loop(&r);
     tty_restore();
-    
+
     exit(0);
 }

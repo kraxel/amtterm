@@ -13,6 +13,7 @@ $amt_debug = $ENV{'AMT_DEBUG'} if defined($ENV{'AMT_DEBUG'});
 
 my $amt_command = shift;
 $amt_command = "info" if !defined($amt_command);
+my $amt_arg = shift;
 
 my $amt_version;
 
@@ -277,7 +278,12 @@ sub remote_control($) {
 	if ($reply =~ m/^(y|yes)$/i) {
 		printf "execute: %s\n", $command;
 		push (@args, SOAP::Data->name('Command' => $rcc{$command}));
-		push (@args, SOAP::Data->name('IanaOemNumber' => 4542));
+		push (@args, SOAP::Data->name('IanaOemNumber' => 343));
+		if (defined($amt_arg) && $amt_arg eq 'bios') {
+			push (@args, SOAP::Data->name('OEMparameters' => 1 ));
+			push (@args, SOAP::Data->name('SpecialCommand' => 0xC1 ));
+			push (@args, SOAP::Data->name('SpecialCommandParameter' => 0));
+		}
 		do_soap($rcs, "RemoteControl", @args);
 	} else {
 		printf "canceled\n";

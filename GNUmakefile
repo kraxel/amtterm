@@ -55,6 +55,7 @@ clean:
 
 distclean: clean
 	rm -f Make.config
+	rm -f mk/*.dep
 
 #################################################################
 
