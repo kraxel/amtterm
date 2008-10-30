@@ -2,7 +2,7 @@
 .SH NAME
 amttool - remotely control Intel AMT managed machines.
 .SH SYNOPSIS
-.B amttool host [ command ]
+.B amttool host [ command ] [ arg ]
 .SH DESCRIPTION
 .B amttool
 is a perl script which speaks SOAP to Intel AMT managed machines.
@@ -24,16 +24,17 @@ For more inforamtions on Intel AMT check amt-howto(7).
 .B info
 gather information (default).
 .TP
-.B reset
-reset machine.
+.B reset [ bios ]
+reset machine.  Optional bios argument asks for the BIOS boot
+messages being redirected to serial-over-lan.
 .TP
-.B powerup
+.B powerup [ bios ]
 turn on machine.
 .TP
 .B powerdown
 turn off machine.
 .TP
-.B powercycle
+.B powercycle [ bios ]
 powercycle machine.
 .TP
 .B netinfo
