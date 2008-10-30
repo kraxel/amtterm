@@ -6,6 +6,7 @@ DESTDIR	=
 srcdir	?= .
 prefix	?= /usr/local
 bindir	=  $(DESTDIR)$(prefix)/bin
+sbindir	=  $(DESTDIR)$(prefix)/sbin
 libdir  =  $(DESTDIR)$(prefix)/$(LIB)
 shrdir  =  $(DESTDIR)$(prefix)/share
 mandir	=  $(shrdir)/man
