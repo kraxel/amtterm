@@ -56,6 +56,7 @@ struct gamt_window {
     guint          id;
 
     /* logging */
+    char           *logname;
     FILE           *logfile;
 };
 
@@ -96,6 +97,82 @@ static void gamt_rebuild_hosts(struct gamt_window *gamt);
 #define CFG_FOREGROUND    CFG_SECTION, "foreground"
 #define CFG_BACKGROUND    CFG_SECTION, "background"
 #define CFG_BLINK         CFG_SECTION, "blink-cursor"
+
+/* ------------------------------------------------------------------ */
+
+static int log_getfile(struct gamt_window *gamt)
+{
+    GtkWidget *dialog;
+    int ret = -1;
+
+    dialog = gtk_file_chooser_dialog_new("Logfile",
+                                         GTK_WINDOW(gamt->win),
+                                         GTK_FILE_CHOOSER_ACTION_SAVE,
+                                         GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
+                                         GTK_STOCK_SAVE, GTK_RESPONSE_ACCEPT,
+                                         NULL);
+
+    if (!gamt->logname) {
+        char defname[80];
+        snprintf(defname, sizeof(defname), "%s.log", gamt->redir.host);
+        gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), defname);
+    } else {
+        gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(dialog), gamt->logname);
+    }
+
+    if (gtk_dialog_run(GTK_DIALOG (dialog)) == GTK_RESPONSE_ACCEPT) {
+        free(gamt->logname);
+        gamt->logname = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER (dialog));
+        ret = 0;
+    }
+    gtk_widget_destroy (dialog);
+    return ret;
+}
+
+static void log_start(struct gamt_window *gamt)
+{
+    GtkWidget *item;
+
+    if (gamt->logfile)
+        goto out;
+    if (!gamt->logname) {
+        if (log_getfile(gamt) < 0)
+            goto out;
+    }
+
+    gamt->logfile = fopen(gamt->logname, "a");
+    if (!gamt->logfile) {
+        fprintf(stderr, "warning: open log %s: %s\n",
+                gamt->logname, strerror(errno));
+        goto out;
+    }
+    setvbuf(gamt->logfile, NULL, _IONBF /* unbuffered */, 0);
+
+out:
+    item = gtk_ui_manager_get_widget(gamt->ui, "/MainMenu/TtyMenu/WriteLog");
+    gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(item),
+                                   gamt->logfile ? TRUE : FALSE);
+}
+
+static void log_write(struct gamt_window *gamt, unsigned char *buf, int len)
+{
+    if (!gamt->logfile)
+        return;
+    /* Hmm, filter out control codes? */
+    fwrite(buf, len, 1, gamt->logfile);
+}
+
+static void log_stop(struct gamt_window *gamt)
+{
+    GtkWidget *item;
+
+    if (!gamt->logfile)
+        return;
+    fclose(gamt->logfile);
+    gamt->logfile = NULL;
+    item = gtk_ui_manager_get_widget(gamt->ui, "/MainMenu/TtyMenu/WriteLog");
+    gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(item), FALSE);
+}
 
 /* ------------------------------------------------------------------ */
 
@@ -141,6 +218,38 @@ static void menu_cb_disconnect(GtkAction *action, void *data)
     if (gamt->redir.state != REDIR_RUN_SOL)
 	return;
     redir_sol_stop(&gamt->redir);
+}
+
+static void menu_cb_logfile(GtkAction *action, void *data)
+{
+    struct gamt_window *gamt = data;
+
+    if (log_getfile(gamt) < 0)
+        return;
+    if (gamt->logfile) {
+        log_stop(gamt);
+        log_start(gamt);
+    }
+}
+
+static void menu_cb_reset_terminal(GtkAction *action, void *data)
+{
+    struct gamt_window *gamt = data;
+
+    vte_terminal_reset(VTE_TERMINAL(gamt->vte), TRUE, TRUE);
+}
+
+static void menu_cb_write_log(GtkToggleAction *action, gpointer data)
+{
+    struct gamt_window *gamt = data;
+    gboolean state = gtk_toggle_action_get_active(action);
+
+    if (amt_debug)
+	fprintf(stderr, "%s: %s\n", __FUNCTION__, state ? "on" : "off");
+    if (state)
+        log_start(gamt);
+    else
+        log_stop(gamt);
 }
 
 static void menu_cb_config_font(GtkAction *action, void *data)
@@ -306,10 +415,9 @@ static void destroy_cb(GtkWidget *widget, gpointer data)
 static int recv_gtk(void *cb_data, unsigned char *buf, int len)
 {
     struct gamt_window *gamt = cb_data;
+
+    log_write(gamt, buf, len);
     vte_terminal_feed(VTE_TERMINAL(gamt->vte), buf, len);
-    if (gamt->logfile) {
-        fwrite(buf, len, 1, gamt->logfile);
-    }
     return 0;
 }
 
@@ -340,8 +448,8 @@ static void state_gtk(void *cb_data, enum redir_state old, enum redir_state new)
 	    gamt_rebuild_hosts(gamt);
 	/* fall through */
     default:
-	snprintf(buf, sizeof(buf), "%s: %s", gamt->redir.host,
-		 redir_state_desc(new));
+        snprintf(buf, sizeof(buf), "%s: %s", gamt->redir.host,
+                 redir_state_desc(new));
 	break;
     }
     if (state_stock[new])
@@ -366,11 +474,14 @@ static const GtkActionEntry entries[] = {
 	.name        = "FileMenu",
 	.label       = "_File",
     },{
-	.name        = "ConfigMenu",
-	.label       = "_Options",
-    },{
 	.name        = "HostMenu",
 	.label       = "Ho_sts",
+    },{
+	.name        = "TtyMenu",
+	.label       = "_Terminal",
+    },{
+	.name        = "ConfigMenu",
+	.label       = "_Appearance",
     },{
 	.name        = "HelpMenu",
 	.label       = "_Help",
@@ -387,10 +498,21 @@ static const GtkActionEntry entries[] = {
 	.label       = "_Disconnect",
 	.callback    = G_CALLBACK(menu_cb_disconnect),
     },{
+	.name        = "Logfile",
+	.stock_id    = GTK_STOCK_SAVE,
+	.label       = "_Logfile ...",
+	.callback    = G_CALLBACK(menu_cb_logfile),
+    },{
 	.name        = "Quit",
 	.stock_id    = GTK_STOCK_QUIT,
 	.label       = "_Quit",
 	.callback    = G_CALLBACK(menu_cb_quit),
+    },{
+
+	/* Terminal menu */
+	.name        = "ResetTerminal",
+	.label       = "Reset",
+	.callback    = G_CALLBACK(menu_cb_reset_terminal),
     },{
 
 	/* Config menu */
@@ -429,6 +551,10 @@ static const GtkActionEntry entries[] = {
 
 static const GtkToggleActionEntry tentries[] = {
     {
+	.name        = "WriteLog",
+	.label       = "Enable logging",
+	.callback    = G_CALLBACK(menu_cb_write_log),
+    },{
 	.name        = "BlinkCursor",
 	.label       = "Blinking cursor",
 	.callback    = G_CALLBACK(menu_cb_blink_cursor),
@@ -442,9 +568,16 @@ static char ui_xml[] =
 "      <menuitem action='Connect'/>\n"
 "      <menuitem action='Disconnect'/>\n"
 "      <separator/>\n"
+"      <menuitem action='Logfile'/>\n"
+"      <separator/>\n"
 "      <menuitem action='Quit'/>\n"
 "    </menu>\n"
 "    <menu action='HostMenu'>\n"
+"    </menu>\n"
+"    <menu action='TtyMenu'>\n"
+"      <menuitem action='ResetTerminal'/>\n"
+"      <separator/>\n"
+"      <menuitem action='WriteLog'/>\n"
 "    </menu>\n"
 "    <menu action='ConfigMenu'>\n"
 "      <menuitem action='VteFont'/>\n"
@@ -835,12 +968,8 @@ main(int argc, char *argv[])
 	exit(1);
 
     if (log) {
-        gamt->logfile = fopen(log, "a");
-        if (gamt->logfile) {
-            setvbuf(gamt->logfile, NULL, _IONBF /* unbuffered */, 0);
-        } else {
-            fprintf(stderr, "warning: open %s: %s\n", log, strerror(errno));
-        }
+        gamt->logname = strdup(log);
+        log_start(gamt);
     }
 
     if (optind+1 <= argc) {
