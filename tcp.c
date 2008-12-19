@@ -128,7 +128,7 @@ int tcp_listen(struct addrinfo *ai, char *addr, char *port)
     char uaddr[INET6_ADDRSTRLEN+1];
     char uport[33];
     int slisten,rc,opt=1;
-    
+
     /* lookup */
     ai->ai_flags = AI_PASSIVE;
     if (0 != (rc = getaddrinfo(addr, port, ai, &res))) {

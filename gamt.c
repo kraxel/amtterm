@@ -54,6 +54,9 @@ struct gamt_window {
     struct redir   redir;
     GIOChannel     *ch;
     guint          id;
+
+    /* logging */
+    FILE           *logfile;
 };
 
 static const char *state_stock[] = {
@@ -119,7 +122,7 @@ static void menu_cb_connect(GtkAction *action, void *data)
 static void menu_cb_connect_to(GtkAction *action, void *data)
 {
     struct gamt_window *gamt = data;
-    
+
     if (gamt->redir.state != REDIR_NONE &&
 	gamt->redir.state != REDIR_CLOSED &&
 	gamt->redir.state != REDIR_ERROR)
@@ -173,7 +176,7 @@ static int pickcolor(char *title, GdkColor *color)
     csel = GTK_COLOR_SELECTION(GTK_COLOR_SELECTION_DIALOG(dialog)->colorsel);
     gtk_color_selection_set_has_opacity_control(csel, FALSE);
     gtk_color_selection_set_current_color(csel, color);
-    
+
     gtk_widget_show_all(dialog);
     switch (gtk_dialog_run(GTK_DIALOG(dialog))) {
     case GTK_RESPONSE_OK:
@@ -304,6 +307,9 @@ static int recv_gtk(void *cb_data, unsigned char *buf, int len)
 {
     struct gamt_window *gamt = cb_data;
     vte_terminal_feed(VTE_TERMINAL(gamt->vte), buf, len);
+    if (gamt->logfile) {
+        fwrite(buf, len, 1, gamt->logfile);
+    }
     return 0;
 }
 
@@ -479,7 +485,7 @@ static int gamt_getstring(GtkWidget *window, char *title, char *message,
     GtkWidget *dialog, *label, *entry;
     const char *txt;
     int retval;
-   
+
     /* Create the widgets */
     dialog = gtk_dialog_new_with_buttons(title,
 					 GTK_WINDOW(window),
@@ -490,7 +496,7 @@ static int gamt_getstring(GtkWidget *window, char *title, char *message,
 					 GTK_RESPONSE_REJECT,
                                          NULL);
     gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_ACCEPT);
-    
+
     label = gtk_label_new(message);
     gtk_misc_set_alignment(GTK_MISC(label), 0, 0.5);
 
@@ -578,7 +584,7 @@ static void gamt_rebuild_hosts(struct gamt_window *gamt)
 	gtk_action_group_add_actions(gamt->hosts_ag, &entry, 1, gamt);
     }
     pos += sprintf(hosts_xml+pos, "%s", hosts_xml_end);
-    
+
     /* add */
     gtk_ui_manager_insert_action_group(gamt->ui, gamt->hosts_ag, 1);
     gamt->hosts_id = gtk_ui_manager_add_ui_from_string(gamt->ui, hosts_xml, -1, &err);
@@ -591,7 +597,7 @@ static void gamt_rebuild_hosts(struct gamt_window *gamt)
 static int gamt_connect(struct gamt_window *gamt)
 {
     int rc;
-    
+
     if (0 == strlen(amt_pass)) {
 	char msg[128];
 
@@ -636,7 +642,7 @@ static struct gamt_window *gamt_window()
     gboolean state;
     struct gamt_window *gamt;
     char *str;
-    
+
     gamt = malloc(sizeof(*gamt));
     if (NULL == gamt)
 	return NULL;
@@ -684,14 +690,14 @@ static struct gamt_window *gamt_window()
     state = cfg_get_bool(CFG_BLINK, 0);
     gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(item), state);
     vte_terminal_set_cursor_blinks(VTE_TERMINAL(gamt->vte), state);
-    
+
     /* other widgets */
     gamt->status = gtk_label_new("idle");
     gtk_misc_set_alignment(GTK_MISC(gamt->status), 0, 0.5);
     gtk_misc_set_padding(GTK_MISC(gamt->status), 3, 1);
     gamt->icon = gtk_image_new_from_stock(GTK_STOCK_DISCONNECT,
 					  GTK_ICON_SIZE_SMALL_TOOLBAR);
-    
+
     /* Make a vbox and put stuff in */
     vbox = gtk_vbox_new(FALSE, 1);
     hbox = gtk_hbox_new(FALSE, 1);
@@ -716,7 +722,7 @@ static struct gamt_window *gamt_window()
 
     /* display window */
     gtk_widget_show_all(gamt->win);
-    
+
     str = cfg_get_str(CFG_FOREGROUND);
     if (str) {
 	gdk_color_parse(str, &color);
@@ -747,7 +753,8 @@ static void usage(FILE *fp)
             "   -p pass       password (default: $AMT_PASSWORD)\n"
             "   -f font       terminal font\n"
             "   -c color      text color\n"
-            "   -b color      backgrounf color\n"
+            "   -b color      background color\n"
+            "   -l file       logfile\n"
             "\n"
             "By default port 16994 is used.\n"
 	    "If no password is given " APPNAME " will ask for one.\n"
@@ -763,7 +770,7 @@ main(int argc, char *argv[])
     Display *dpy;
     struct gamt_window *gamt;
     char configfile[256];
-    char *h;
+    char *h, *log = NULL;
     int c;
 
     if (NULL != (h = getenv("AMT_PASSWORD")))
@@ -784,7 +791,7 @@ main(int argc, char *argv[])
     fcntl(ConnectionNumber(dpy),F_SETFD,FD_CLOEXEC);
 
     for (;;) {
-        if (-1 == (c = getopt(argc, argv, "hdtu:p:f:c:b:")))
+        if (-1 == (c = getopt(argc, argv, "hdtu:p:f:c:b:l:")))
             break;
         switch (c) {
 	case 'd':
@@ -800,6 +807,10 @@ main(int argc, char *argv[])
 	    snprintf(amt_pass, sizeof(amt_pass), "%s", optarg);
 	    memset(optarg,'*',strlen(optarg)); /* rm passwd from ps list */
 	    break;
+	case 'l':
+            log = optarg;
+	    break;
+
 	case 'f':
 	    cfg_set_str(CFG_FONT, optarg);
 	    break;
@@ -823,11 +834,20 @@ main(int argc, char *argv[])
     if (NULL == gamt)
 	exit(1);
 
+    if (log) {
+        gamt->logfile = fopen(log, "a");
+        if (gamt->logfile) {
+            setvbuf(gamt->logfile, NULL, _IONBF /* unbuffered */, 0);
+        } else {
+            fprintf(stderr, "warning: open %s: %s\n", log, strerror(errno));
+        }
+    }
+
     if (optind+1 <= argc) {
 	snprintf(amt_host, sizeof(amt_host), "%s", argv[optind]);
 	gamt_connect(gamt);
     }
-    
+
     gtk_main();
     cfg_write_file("config", configfile);
     exit(0);

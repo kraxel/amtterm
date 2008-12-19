@@ -92,7 +92,7 @@ static void hexdump(const char *prefix, const unsigned char *data, size_t size)
 static ssize_t redir_write(struct redir *r, const char *buf, size_t count)
 {
     int rc;
-    
+
     if (r->trace)
 	hexdump("out", buf, count);
     rc = write(r->sock, buf, count);
@@ -147,7 +147,9 @@ int redir_connect(struct redir *r)
     r->sock = tcp_connect(&ai, NULL, NULL, r->host,
 			  strlen(r->port) ? r->port : defport);
     if (-1 == r->sock) {
-	redir_state(r, REDIR_ERROR);
+        redir_state(r, REDIR_ERROR);
+        /* FIXME: better error message */
+        snprintf(r->err, sizeof(r->err), "connect failed");
 	return -1;
     }
     return 0;
