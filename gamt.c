@@ -1,7 +1,7 @@
 /*
  *  amtterm -- Intel AMT serial-over-lan client, gtk version.
  *
- *  Copyright (C) 2007 Gerd Hoffmann <kraxel@redhat.com
+ *  Copyright (C) 2007,08 Gerd Hoffmann <kraxel@redhat.com
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -386,7 +386,7 @@ static void menu_cb_man_amt_howto(GtkAction *action, void *data)
 static void menu_cb_about(GtkAction *action, void *data)
 {
     static char *comments = "Intel AMT serial-over-lan client";
-    static char *copyright = "(c) 2007 Gerd Hoffmann";
+    static char *copyright = "(c) 2007,08 Gerd Hoffmann";
     static char *website = "http://dl.bytesex.org/releases/amtterm/";
     static char *authors[] = { "Gerd Hoffmann <kraxel@redhat.com>", NULL };
     struct gamt_window *gamt = data;
@@ -893,7 +893,7 @@ static void usage(FILE *fp)
 	    "If no password is given " APPNAME " will ask for one.\n"
             "\n"
             "-- \n"
-            "(c) 2007 Gerd Hoffmann <kraxel@redhat.com>\n"
+            "(c) 2007,08 Gerd Hoffmann <kraxel@redhat.com>\n"
 	    "\n");
 }
 

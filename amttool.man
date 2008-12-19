@@ -1,8 +1,8 @@
-.TH amttool 1 "(c) 2007 Gerd Hoffmann"
+.TH amttool 1 "(c) 2007,08 Gerd Hoffmann"
 .SH NAME
 amttool - remotely control Intel AMT managed machines.
 .SH SYNOPSIS
-.B amttool host [ command ] [ arg ]
+.B amttool host [ command ] [ arg(s) ]
 .SH DESCRIPTION
 .B amttool
 is a perl script which speaks SOAP to Intel AMT managed machines.
