@@ -73,13 +73,13 @@ Network boot via PXE.
 Boot from local disk.
 .TP
 .B hdsafe
-Fixme.
-.TP
-.B diag
-Fixme.
+Boot from local disk (safe mode).
 .TP
 .B cd
 Boot from CD/DVD.
+.TP
+.B diag
+Boot in diagnostics mode.
 .SH ENVIRONMENT
 .TP
 .B AMT_PASSWORD
