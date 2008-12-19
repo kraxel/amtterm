@@ -24,17 +24,16 @@ For more inforamtions on Intel AMT check amt-howto(7).
 .B info
 gather information (default).
 .TP
-.B reset [ bios ]
-reset machine.  Optional bios argument asks for the BIOS boot
-messages being redirected to serial-over-lan.
+.B reset [ special ]
+reset machine, with optional special command (see section below).
 .TP
-.B powerup [ bios ]
+.B powerup [ special ]
 turn on machine.
 .TP
 .B powerdown
 turn off machine.
 .TP
-.B powercycle [ bios ]
+.B powercycle [ special ]
 powercycle machine.
 .TP
 .B netinfo
@@ -60,6 +59,27 @@ are the DNS Servers.  If no IP configuration is specified the tool
 tries to configure the machine in shared mac address mode with dhcp,
 otherwise in separate mac address mode with static IP address.
 Default for dns1 is the gateway address, for dns2 it is 0.0.0.0.
+.SH SPECIAL COMMANDS
+Special commands can optionally be specified for reset, powerup and
+powercycle.  They change the default boot behavior of the machine.
+.TP
+.B bios
+Asks for the BIOS boot messages being redirected to serial-over-lan.
+.TP
+.B pxe
+Network boot via PXE.
+.TP
+.B hd
+Boot from local disk.
+.TP
+.B hdsafe
+Fixme.
+.TP
+.B diag
+Fixme.
+.TP
+.B cd
+Boot from CD/DVD.
 .SH ENVIRONMENT
 .TP
 .B AMT_PASSWORD

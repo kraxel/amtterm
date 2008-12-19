@@ -28,6 +28,18 @@ my %rcc = (
 	"powercycle" => "19",
 );
 
+my %rccs = (
+	"nop"        => "0",
+	"pxe"	     => "1",
+	"hd"         => "2",
+	"hdsafe"     => "3",
+	"diag"       => "4",
+	"cd"         => "5",
+);
+my %rccs_oem = (
+	"bios"       => 0xc1,
+);
+
 # incomplete list
 my %pt_status = (
 	0x0  =>  "success",
@@ -267,8 +279,9 @@ sub print_network_info() {
 	}
 }
 
-sub remote_control($) {
+sub remote_control($$) {
 	my $command = shift;
+	my $special = shift;
 	my @args;
 
 	my $hostname = $nas->GetHostName()->paramsout;
@@ -279,10 +292,14 @@ sub remote_control($) {
 		printf "execute: %s\n", $command;
 		push (@args, SOAP::Data->name('Command' => $rcc{$command}));
 		push (@args, SOAP::Data->name('IanaOemNumber' => 343));
-		if (defined($amt_arg) && $amt_arg eq 'bios') {
+		if (defined($special) && defined($rccs{$special})) {
+			push (@args, SOAP::Data->name('SpecialCommand' 
+						      => $rccs{$special} ));
+		}
+		if (defined($special) && defined($rccs_oem{$special})) {
 			push (@args, SOAP::Data->name('OEMparameters' => 1 ));
-			push (@args, SOAP::Data->name('SpecialCommand' => 0xC1 ));
-			push (@args, SOAP::Data->name('SpecialCommandParameter' => 0));
+			push (@args, SOAP::Data->name('SpecialCommand' 
+						      => $rccs_oem{$special} ));
 		}
 		do_soap($rcs, "RemoteControl", @args);
 	} else {
@@ -374,7 +391,7 @@ if ($amt_command eq "info") {
 	check_amt_version(2,5);
 	configure_network(@ARGV);
 } elsif ($amt_command =~ m/^(reset|powerup|powerdown|powercycle)$/) {
-	remote_control($amt_command);
+	remote_control($amt_command, $amt_arg);
 } else {
 	print "unknown command: $amt_command\n";
 }
