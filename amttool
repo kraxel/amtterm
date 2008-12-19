@@ -125,7 +125,7 @@ sub usage() {
 
 This utility can talk to Intel AMT managed machines.
 
-usage: amttool <hostname> [ <command> ]
+usage: amttool <hostname> [ <command> ] [ <arg(s)> ]
 commands:
    info            - print some machine info (default).
    reset           - reset machine.
