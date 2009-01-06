@@ -257,6 +257,7 @@ static void menu_cb_config_font(GtkAction *action, void *data)
     struct gamt_window *gamt = data;
     GtkWidget *dialog;
     char *fontname;
+    int done = 0;
 
     dialog = gtk_font_selection_dialog_new("Terminal font");
     fontname = cfg_get_str(CFG_FONT);
@@ -264,13 +265,21 @@ static void menu_cb_config_font(GtkAction *action, void *data)
 	(GTK_FONT_SELECTION_DIALOG(dialog), fontname);
 
     gtk_widget_show_all(dialog);
-    switch (gtk_dialog_run(GTK_DIALOG(dialog))) {
-    case GTK_RESPONSE_OK:
-	fontname = gtk_font_selection_dialog_get_font_name
-	    (GTK_FONT_SELECTION_DIALOG(dialog));
-	vte_terminal_set_font_from_string(VTE_TERMINAL(gamt->vte), fontname);
-	cfg_set_str(CFG_FONT, fontname);
-	break;
+    while (!done) {
+        switch (gtk_dialog_run(GTK_DIALOG(dialog))) {
+        case GTK_RESPONSE_OK:
+            done=1;
+            /* fall through */
+        case GTK_RESPONSE_APPLY:
+            fontname = gtk_font_selection_dialog_get_font_name
+                (GTK_FONT_SELECTION_DIALOG(dialog));
+            vte_terminal_set_font_from_string(VTE_TERMINAL(gamt->vte), fontname);
+            cfg_set_str(CFG_FONT, fontname);
+            break;
+        default:
+            done=1;
+            break;
+        }
     }
     gtk_widget_destroy(dialog);
 }
