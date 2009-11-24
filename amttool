@@ -307,9 +307,9 @@ sub remote_control($$) {
 						      => $rccs{$special} ));
 		}
 		if (defined($special) && defined($rccs_oem{$special})) {
-			push (@args, SOAP::Data->name('OEMparameters' => 1 ));
 			push (@args, SOAP::Data->name('SpecialCommand' 
 						      => $rccs_oem{$special} ));
+			push (@args, SOAP::Data->name('OEMparameters' => 1 ));
 		}
 		do_soap($rcs, "RemoteControl", @args);
 	} else {
