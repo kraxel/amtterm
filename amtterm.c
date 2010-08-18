@@ -39,7 +39,7 @@ static int recv_tty(void *cb_data, unsigned char *buf, int len)
 {
 //    struct redir *r = cb_data;
 
-    return write(0, buf, len);
+    return write(STDOUT_FILENO, buf, len);
 }
 
 static void state_tty(void *cb_data, enum redir_state old, enum redir_state new)
@@ -79,7 +79,7 @@ static int redir_loop(struct redir *r)
 
 	FD_ZERO(&set);
 	if (r->state == REDIR_RUN_SOL)
-	    FD_SET(0,&set);
+	    FD_SET(STDIN_FILENO,&set);
 	FD_SET(r->sock,&set);
 	tv.tv_sec  = HEARTBEAT_INTERVAL * 4 / 1000;
 	tv.tv_usec = 0;
@@ -92,9 +92,9 @@ static int redir_loop(struct redir *r)
 	    return -1;
 	}
 
-	if (FD_ISSET(0,&set)) {
+	if (FD_ISSET(STDIN_FILENO,&set)) {
 	    /* stdin has data */
-	    rc = read(0,buf,BUFSIZE);
+	    rc = read(STDIN_FILENO,buf,BUFSIZE);
 	    switch (rc) {
 	    case -1:
 		perror("read(stdin)");
@@ -134,8 +134,8 @@ int             saved_fl;
 
 static void tty_save(void)
 {
-    fcntl(0,F_GETFL,&saved_fl);
-    tcgetattr (0, &saved_attributes);
+    fcntl(STDIN_FILENO,F_GETFL,&saved_fl);
+    tcgetattr (STDIN_FILENO, &saved_attributes);
 }
 
 static void tty_noecho(void)
@@ -144,25 +144,25 @@ static void tty_noecho(void)
 
     memcpy(&tattr,&saved_attributes,sizeof(struct termios));
     tattr.c_lflag &= ~(ECHO);
-    tcsetattr (0, TCSAFLUSH, &tattr);
+    tcsetattr (STDIN_FILENO, TCSAFLUSH, &tattr);
 }
 
 static void tty_raw(void)
 {
     struct termios tattr;
 
-    fcntl(0,F_SETFL,O_NONBLOCK);
+    fcntl(STDIN_FILENO,F_SETFL,O_NONBLOCK);
     memcpy(&tattr,&saved_attributes,sizeof(struct termios));
     tattr.c_lflag &= ~(ISIG|ICANON|ECHO);
     tattr.c_cc[VMIN] = 1;
-    tattr.c_cc[VTIME] = 0;
-    tcsetattr (0, TCSAFLUSH, &tattr);
+    tattr.c_cc[VTIME] = STDIN_FILENO;
+    tcsetattr (STDIN_FILENO, TCSAFLUSH, &tattr);
 }
 
 static void tty_restore(void)
 {
-    fcntl(0,F_SETFL,saved_fl);
-    tcsetattr (0, TCSANOW, &saved_attributes);
+    fcntl(STDIN_FILENO,F_SETFL,saved_fl);
+    tcsetattr (STDIN_FILENO, TCSANOW, &saved_attributes);
 }
 
 /* ------------------------------------------------------------------ */
