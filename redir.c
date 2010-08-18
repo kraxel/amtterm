@@ -24,6 +24,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #include "tcp.h"
 #include "redir.h"
@@ -254,6 +255,7 @@ int redir_sol_recv(struct redir *r)
 {
     unsigned char msg[64];
     int count, len, bshift;
+    int flags;
 
     len = r->buf[8] + (r->buf[9] << 8);
     count = r->blen - 10;
@@ -270,7 +272,13 @@ int redir_sol_recv(struct redir *r)
 	count = sizeof(msg);
 	if (count > len)
 	    count = len;
+	/* temporarily switch to blocking.  the actual data may not be
+	   ready yet, but should be here Real Soon Now. */
+	flags = fcntl(r->sock,F_GETFL);
+	fcntl(r->sock,F_SETFL, flags & (~O_NONBLOCK));
 	count = read(r->sock, msg, count);
+	fcntl(r->sock,F_SETFL, flags);
+
 	switch (count) {
 	case -1:
 	    snprintf(r->err, sizeof(r->err), "read(socket): %s", strerror(errno));
