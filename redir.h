@@ -18,8 +18,8 @@ struct redir {
     /* host connection */
     unsigned char     host[64];
     unsigned char     port[16];
-    unsigned char     user[16];
-    unsigned char     pass[16];
+    unsigned char     user[64];
+    unsigned char     pass[64];
 
     /* serial-over-lan */
     unsigned char     type[4];
