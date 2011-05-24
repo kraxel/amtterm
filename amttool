@@ -6,6 +6,16 @@ use SOAP::Lite;
 
 my $amt_host = shift;
 my $amt_port = "16992";
+my $amt_proto = 'http';
+
+if ($amt_host =~ /([^:]+):(\d+)/) {
+  $amt_host = $1;
+  $amt_port = $2;
+  if ($amt_port == 16993) {
+    $amt_proto = 'https';
+  }
+}
+
 $main::amt_user = "admin";
 $main::amt_pass = $ENV{'AMT_PASSWORD'};
 my $amt_debug = 0;
@@ -96,7 +106,7 @@ sub SOAP::Transport::HTTP::Client::get_basic_credentials {
 }
 
 sub soap_init() {
-	my $proxybase = "http://$amt_host:$amt_port";
+	my $proxybase = "$amt_proto://$amt_host:$amt_port";
 	my $schemabase = "http://schemas.intel.com/platform/client";
 
 	$nas = SOAP::Lite->new(
