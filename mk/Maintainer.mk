@@ -20,7 +20,7 @@ tarball = $(release-dir)/$(repository)-$(VERSION).tar
 .PHONY: release
 release:
 	git tag -m "release $(VERSION)" "$(VERSION)"
-	git push
+	git push --tags
 	git archive --format=tar --prefix=$(repository)-$(VERSION)/ \
 		-o $(tarball) $(VERSION)
 	gzip $(tarball)
