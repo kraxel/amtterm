@@ -382,6 +382,24 @@ int redir_data(struct redir *r)
 		goto again;
 	    redir_stop(r);
 	    break;
+        case SOL_0x29:
+            bshift = SOL_0x29_LENGTH;
+	    if (r->blen < bshift)
+		goto again;
+            /* There is some data in this packet. Probably some port
+             * reset data, flow control or whatever. I've seen the following:
+             *
+             *  0x29 0x00 0x00 0x00 0x03 0x00 0x00 0x00 0x00 0x06
+             *  0x29 0x00 0x00 0x00 0x04 0x00 0x00 0x00 0x02 0x04
+
+             *  0x29 0x00 0x00 0x00 0x91 0x00 0x00 0x00 0x00 0x00
+             *  0x29 0x00 0x00 0x00 0x92 0x00 0x00 0x00 0x00 0x04
+             *
+             *  It seems harmless to just ignore this stuff, the
+             *  redirection keeps working anyway.
+             */
+	    break;
+
 	default:
 	    snprintf(r->err, sizeof(r->err), "%s: unknown r->buf 0x%02x",
 		     __FUNCTION__, r->buf[0]);

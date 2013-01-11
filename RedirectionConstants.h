@@ -24,6 +24,10 @@
 #define SOL_KEEP_ALIVE_PING                 0x24  //Console to Host
 #define SOL_KEEP_ALIVE_PONG                 0x25  //Host to Console
 #define SOL_DATA_TO_HOST                    0x28  //Console to host
+
+#define SOL_0x29                            0x29  // encountered in the wild
+#define SOL_0x29_LENGTH                     10
+
 #define SOL_DATA_FROM_HOST                  0x2A  //Host to Console
 #define SOL_HEARTBEAT                       0x2B
 
