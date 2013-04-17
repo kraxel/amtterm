@@ -1,4 +1,5 @@
 #include "RedirectionConstants.h"
+#include <stdint.h>
 
 enum redir_state {
     REDIR_NONE      =  0,
@@ -36,6 +37,14 @@ struct redir {
     void *cb_data;
     void (*cb_state)(void *cb_data, enum redir_state old, enum redir_state new);
     int (*cb_recv)(void *cb_data, unsigned char *buf, int len);
+};
+
+struct __attribute__ ((__packed__)) controls_from_host_message {
+    unsigned char type; // 0x29
+    unsigned char reserved[3];
+    uint32_t      host_sequence_number;
+    unsigned char control; 
+    unsigned char status;
 };
 
 const char *redir_state_name(enum redir_state state);

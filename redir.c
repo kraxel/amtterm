@@ -298,6 +298,9 @@ int redir_sol_recv(struct redir *r)
     return bshift;
 }
 
+static int in_loopback_mode = 0;
+static int powered_off = 0;
+
 int redir_data(struct redir *r)
 {
     int rc, bshift;
@@ -382,24 +385,55 @@ int redir_data(struct redir *r)
 		goto again;
 	    redir_stop(r);
 	    break;
-        case SOL_0x29:
-            bshift = SOL_0x29_LENGTH;
-	    if (r->blen < bshift)
-		goto again;
-            /* There is some data in this packet. Probably some port
-             * reset data, flow control or whatever. I've seen the following:
-             *
-             *  0x29 0x00 0x00 0x00 0x03 0x00 0x00 0x00 0x00 0x06
-             *  0x29 0x00 0x00 0x00 0x04 0x00 0x00 0x00 0x02 0x04
+	case SOL_CONTROLS_FROM_HOST: {
+	  bshift = r->blen; /* FIXME */
+	  if (r->blen < bshift)
+	    goto again;
+	  
+	  /* Host sends this message to the Management Console when
+	   * the host has changed its COM port control lines. This
+	   * message is likely to be one of the first messages that
+	   * the Host sends to the Console after it starts SOL
+	   * redirection.
+	   */
+	  struct controls_from_host_message *msg = (struct controls_from_host_message *) r->buf;
+	  //printf("Type %x, control %d, status %d\n", msg->type, msg->control, msg->status);
+	  if (msg->status & LOOPBACK_ACTIVE) {
+	    if (r->verbose)
+	      fprintf (stderr, "Warning, SOL device is running in loopback mode.  Text input may not be accepted\n");
+	    in_loopback_mode = 1;
+	  } else if (in_loopback_mode) {
+	    if (r->verbose)
+	      fprintf (stderr, "SOL device is no longer running in loopback mode\n");
+	    in_loopback_mode = 0;
+	  }
 
-             *  0x29 0x00 0x00 0x00 0x91 0x00 0x00 0x00 0x00 0x00
-             *  0x29 0x00 0x00 0x00 0x92 0x00 0x00 0x00 0x00 0x04
-             *
-             *  It seems harmless to just ignore this stuff, the
-             *  redirection keeps working anyway.
-             */
-	    break;
+	  if (0 == (msg->status & SYSTEM_POWER_STATE))  {
+	    if (r->verbose)
+	      fprintf (stderr, "The system is powered off.\n");
+	    powered_off = 1;
+	  } else if (powered_off) {
+	    if (r->verbose)
+	      fprintf (stderr, "The system is powered on.\n");
+	    powered_off = 0;
+	  }
+	  
+	  if (r->verbose) {
+	    if (msg->status & (TX_OVERFLOW|RX_FLUSH_TIMEOUT|TESTMODE_ACTIVE))
+	      fprintf (stderr, "Other unhandled status condition\n");
+	    
+	    if (msg->control & RTS_CONTROL) 
+	      fprintf (stderr, "RTS is asserted on the COM Port\n");
+	    
+	    if (msg->control & DTR_CONTROL) 
+	      fprintf (stderr, "DTR is asserted on the COM Port\n");
+	    
+	    if (msg->control & BREAK_CONTROL) 
+	      fprintf (stderr, "BREAK is asserted on the COM Port\n");
+	  }
 
+	  break;
+	}
 	default:
 	    snprintf(r->err, sizeof(r->err), "%s: unknown r->buf 0x%02x",
 		     __FUNCTION__, r->buf[0]);
