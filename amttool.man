@@ -23,7 +23,7 @@ For more inforamtions on Intel AMT check amt-howto(7).
 .B Note:
 Starting with AMT 9.0 Intel has removed support for
 the old SOAP protocol which is used by amttool.
-Only WS Management (added in AMT 6.0) is supported by recent
+Only WS Management (added in AMT 3.0) is supported by recent
 machines.  You can use wsmancli (see http://openwsman.sf.net,
 your distro should have packages ready) instead.
 .SH COMMANDS
