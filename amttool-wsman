@@ -17,10 +17,14 @@ case "$action" in
 redir-listen)
 	wsman put ${redir_scheme} ${wsman_opts} -k ListenerEnabled=true
 	;;
+rfb-password)
+	wsman put ${redir_scheme} ${wsman_opts} -k RFBPassword="${AMT_PASSWORD}"
+	;;
 -h | --help | help)
 	echo "usage: $0 action host"
 	echo "actions:"
 	echo "    redir-listen          enable redirection service listener"
+	echo "    rfb-password          set rfb password to \$AMT_PASSWORD"
 	;;
 *)
 	echo "unknown action: $action (try help)"
