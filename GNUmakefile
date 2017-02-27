@@ -20,7 +20,7 @@ include mk/Autoconf.mk
 define make-config
 LIB		:= $(LIB)
 HAVE_GTK	:= $(call ac_pkg_config,gtk+-x11-3.0)
-HAVE_VTE	:= $(call ac_pkg_config,vte-2.90)
+HAVE_VTE	:= $(call ac_pkg_config,vte-2.91)
 endef
 
 #################################################################

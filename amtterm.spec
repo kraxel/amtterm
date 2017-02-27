@@ -10,7 +10,7 @@ Requires:     xdg-utils
 
 BuildRequires: desktop-file-utils
 BuildRequires: pkgconfig(gtk+-x11-3.0)
-BuildRequires: pkgconfig(vte-2.90)
+BuildRequires: pkgconfig(vte-2.91)
 
 %description
 Serial-over-lan (sol) client for Intel AMT.
