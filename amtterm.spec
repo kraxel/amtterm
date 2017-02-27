@@ -1,6 +1,6 @@
 Name:         amtterm
 License:      GPLv2+
-Version:      1.4
+Version:      1.5
 Release:      1%{?dist}
 Summary:      Serial-over-lan (sol) client for Intel AMT
 Group:        Applications/Internet
@@ -42,3 +42,6 @@ desktop-file-install --dir=%{buildroot}%{_datadir}/applications/ \
 %{_datadir}/applications/gamt.desktop
 
 %changelog
+* Mon Feb 27 2017 Gerd Hoffmann <kraxel@redhat.com> 1.5-1
+- new package built with tito
+
