@@ -12,16 +12,32 @@ sync:: distclean
 	chmod 444 $(srcdir)/INSTALL $(srcdir)/mk/*.mk
 
 
-repository := $(shell basename $(PWD))
+repository  := $(shell basename $(PWD))
+usetito     := $(shell if test -d .tito; then echo yes; else echo no; fi)
 release-dir ?= $(HOME)/projects/Releases
 release-pub ?= bigendian.kraxel.org:/public/vhosts/www.kraxel.org/releases/$(repository)
-tarball = $(release-dir)/$(repository)-$(VERSION).tar
+tarball      = $(release-dir)/$(repository)-$(VERSION).tar
 
-.PHONY: release
-release:
+ifeq ($(usetito),yes)
+
+$(tarball).gz:
+	tito build --output $(release-dir) --tgz
+
+else
+
+$(tarball).gz:
 	git tag -m "release $(VERSION)" "$(VERSION)"
 	git push --tags
 	git archive --format=tar --prefix=$(repository)-$(VERSION)/ \
 		-o $(tarball) $(VERSION)
 	gzip $(tarball)
-	scp $(tarball).gz $(release-pub)
+
+endif
+
+$(tarball).gz.asc: $(tarball).gz
+	gpg --detach-sign --armor $(tarball).gz
+
+.PHONY: release
+release: $(tarball).gz.asc
+	scp $(tarball).gz* $(release-pub)
+
