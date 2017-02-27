@@ -1,0 +1,33 @@
+#!/bin/sh
+
+# args
+action="$1"; shift;
+host="$1"; shift;
+
+# config
+redir_scheme="http://intel.com/wbem/wscim/1/amt-schema/1/AMT_RedirectionService"
+wsman_opts="-h ${host} -P 16992 -u admin -p ${AMT_PASSWORD}"
+#wsman_opts="${wsman_opts} -d 9"	# debugging
+wsman_opts="${wsman_opts} --noverifyhost"
+
+##############################################################################
+# go!
+
+case "$action" in
+redir-listen)
+	wsman put ${redir_scheme} ${wsman_opts} -k ListenerEnabled=true
+	;;
+rfb-password)
+	wsman put ${redir_scheme} ${wsman_opts} -k RFBPassword="${AMT_PASSWORD}"
+	;;
+-h | --help | help)
+	echo "usage: $0 action host"
+	echo "actions:"
+	echo "    redir-listen          enable redirection service listener"
+	echo "    rfb-password          set rfb password to \$AMT_PASSWORD"
+	;;
+*)
+	echo "unknown action: $action (try help)"
+	exit 1
+	;;
+esac

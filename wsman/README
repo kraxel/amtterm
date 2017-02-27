@@ -1,0 +1,7 @@
+Newer AMT versions stopped supporting the old, soap-based scheme and use
+wsman-based stuff instead.  Here is WIP stuff for it.
+
+Trying to use AMT with my intel NUC doesn't play out very well though.
+The ME displays some on-screen indication on the display that SoL access
+is active, appearently in some way which is incompatible with the i915
+kms driver.  At least the nuc hangs when the driver loads ...

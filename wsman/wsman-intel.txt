@@ -1,0 +1,49 @@
+wiresharked, intel bdw nuc, amt 9.0
+
+
+amt schemas
+-----------
+
+http://intel.com/wbem/wscim/1/amt-schema/1/AMT_AuthorizationService
+http://intel.com/wbem/wscim/1/amt-schema/1/AMT_RedirectionService
+http://intel.com/wbem/wscim/1/ips-schema/1/IPS_KVMRedirectionSettingData
+http://intel.com/wbem/wscim/1/amt-schema/1/AMT_BootCapabilities
+http://intel.com/wbem/wscim/1/amt-schema/1/AMT_BootSettingData
+http://intel.com/wbem/wscim/1/amt-schema/1/AMT_TLSSettingData
+
+
+cim schemas seen
+----------------
+
+http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_KVMRedirectionSAP
+http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ComputerSystem
+http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_PowerManagementCapabilities
+http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_PowerManagementService
+http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_AssociatedPowerManagementService
+http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_EthernetPort
+http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_BootConfigSetting
+http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_BootService
+
+
+before kvm connect
+------------------
+
+http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_KVMRedirectionSAP/RequestStateChange
+  -> RequestStateChange_INPUT  RequestState 2
+  <- RequestStateChange_OUTPUT ReturnValue  0
+
+http://intel.com/wbem/wscim/1/amt-schema/1/AMT_RedirectionService/RequestStateChange
+  -> RequestStateChange_INPUT  RequestState 32771
+  <- RequestStateChange_OUTPUT ReturnValue  0
+
+
+after kvm disconnect
+--------------------
+
+http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_KVMRedirectionSAP/RequestStateChange
+  -> RequestStateChange_INPUT  RequestState 3
+  <- RequestStateChange_OUTPUT ReturnValue  0
+
+http://intel.com/wbem/wscim/1/amt-schema/1/AMT_RedirectionService/RequestStateChange
+  -> RequestStateChange_INPUT  RequestState 32771
+  <- RequestStateChange_OUTPUT ReturnValue  0
