@@ -9,7 +9,8 @@ Source:       http://www.kraxel.org/releases/%{name}/%{name}-%{version}.tar.gz
 Requires:     xdg-utils
 
 BuildRequires: desktop-file-utils
-BuildRequires: pkgconfig(gtk+-x11-3.0)
+BuildRequires: pkgconfig(gtk+-3.0)
+BuildRequires: pkgconfig(gdk-3.0)
 BuildRequires: pkgconfig(vte-2.91)
 
 %description
