@@ -14,7 +14,7 @@ to.
 is the tcp port to use and defaults to 16994 (standard AMT redirection
 port) if unspecified.
 .P
-For more inforamtions on Intel AMT check amt-howto(7).
+For more information on Intel AMT check amt-howto(7).
 .SH OPTIONS
 .TP
 .B -h
