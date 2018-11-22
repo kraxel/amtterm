@@ -8,6 +8,7 @@ URL:          http://www.kraxel.org/blog/linux/amtterm/
 Source:       http://www.kraxel.org/releases/%{name}/%{name}-%{version}.tar.gz
 Requires:     xdg-utils
 
+BuildRequires: gcc
 BuildRequires: desktop-file-utils
 BuildRequires: pkgconfig(gtk+-3.0)
 BuildRequires: pkgconfig(gdk-3.0)
