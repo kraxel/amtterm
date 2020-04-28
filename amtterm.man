@@ -37,6 +37,11 @@ will prompt on the terminal if unspecified.
 .TP
 .B AMT_PASSWORD
 Default value for the password.
+.SH NOTE
+Newer AMT machines have the SoL port disabled by default, it can be
+enabled remotely using:
+"wsman put http://intel.com/wbem/wscim/1/amt-schema/1/AMT_RedirectionService
+-h ${AMT_HOST} -P 16992 -u admin -p ${AMT_PASSWORD} -k ListenerEnabled=true"
 .SH SEE ALSO
 gamt(1), amttool(1), amt-howto(7)
 .SH AUTHOR
