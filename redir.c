@@ -152,9 +152,9 @@ int redir_connect(struct redir *r)
     r->sock = tcp_connect(&ai, NULL, NULL, r->host,
 			  strlen(r->port) ? r->port : defport);
     if (-1 == r->sock) {
-        redir_state(r, REDIR_ERROR);
-        /* FIXME: better error message */
-        snprintf(r->err, sizeof(r->err), "connect failed");
+	redir_state(r, REDIR_ERROR);
+	/* FIXME: better error message */
+	snprintf(r->err, sizeof(r->err), "connect failed");
 	return -1;
     }
     return 0;
@@ -390,54 +390,54 @@ int redir_data(struct redir *r)
 	    redir_stop(r);
 	    break;
 	case SOL_CONTROLS_FROM_HOST:
-        {
-            bshift = r->blen; /* FIXME */
-            if (r->blen < bshift)
-                goto again;
+	{
+	    bshift = r->blen; /* FIXME */
+	    if (r->blen < bshift)
+		goto again;
 
-            /* Host sends this message to the Management Console when
+	    /* Host sends this message to the Management Console when
              * the host has changed its COM port control lines. This
              * message is likely to be one of the first messages that
              * the Host sends to the Console after it starts SOL
              * redirection.
              */
-            struct controls_from_host_message *msg = (struct controls_from_host_message *) r->buf;
-            //printf("Type %x, control %d, status %d\n", msg->type, msg->control, msg->status);
-            if (msg->status & LOOPBACK_ACTIVE) {
-                if (r->verbose)
-                    fprintf (stderr, "Warning, SOL device is running in loopback mode."
-                             "  Text input may not be accepted\n");
-                in_loopback_mode = 1;
-            } else if (in_loopback_mode) {
-                if (r->verbose)
-                    fprintf (stderr, "SOL device is no longer running in loopback mode\n");
-                in_loopback_mode = 0;
-            }
+	    struct controls_from_host_message *msg = (struct controls_from_host_message *) r->buf;
+	    //printf("Type %x, control %d, status %d\n", msg->type, msg->control, msg->status);
+	    if (msg->status & LOOPBACK_ACTIVE) {
+		if (r->verbose)
+		    fprintf (stderr, "Warning, SOL device is running in loopback mode."
+			     "  Text input may not be accepted\n");
+		in_loopback_mode = 1;
+	    } else if (in_loopback_mode) {
+		if (r->verbose)
+		    fprintf (stderr, "SOL device is no longer running in loopback mode\n");
+		in_loopback_mode = 0;
+	    }
 
-            if (0 == (msg->status & SYSTEM_POWER_STATE))  {
-                if (r->verbose)
-                    fprintf (stderr, "The system is powered off.\n");
-                powered_off = 1;
-            } else if (powered_off) {
-                if (r->verbose)
-                    fprintf (stderr, "The system is powered on.\n");
-                powered_off = 0;
-            }
+	    if (0 == (msg->status & SYSTEM_POWER_STATE))  {
+		if (r->verbose)
+		    fprintf (stderr, "The system is powered off.\n");
+		powered_off = 1;
+	    } else if (powered_off) {
+		if (r->verbose)
+		    fprintf (stderr, "The system is powered on.\n");
+		powered_off = 0;
+	    }
 
-            if (r->verbose) {
-                if (msg->status & (TX_OVERFLOW|RX_FLUSH_TIMEOUT|TESTMODE_ACTIVE))
-                    fprintf (stderr, "Other unhandled status condition\n");
+	    if (r->verbose) {
+		if (msg->status & (TX_OVERFLOW|RX_FLUSH_TIMEOUT|TESTMODE_ACTIVE))
+		    fprintf (stderr, "Other unhandled status condition\n");
 
-                if (msg->control & RTS_CONTROL) 
-                    fprintf (stderr, "RTS is asserted on the COM Port\n");
+		if (msg->control & RTS_CONTROL)
+		    fprintf (stderr, "RTS is asserted on the COM Port\n");
 
-                if (msg->control & DTR_CONTROL) 
-                    fprintf (stderr, "DTR is asserted on the COM Port\n");
+		if (msg->control & DTR_CONTROL)
+		    fprintf (stderr, "DTR is asserted on the COM Port\n");
 
-                if (msg->control & BREAK_CONTROL) 
-                    fprintf (stderr, "BREAK is asserted on the COM Port\n");
-            }
-            break;
+		if (msg->control & BREAK_CONTROL)
+		    fprintf (stderr, "BREAK is asserted on the COM Port\n");
+	    }
+	    break;
 	}
 	default:
 	    snprintf(r->err, sizeof(r->err), "%s: unknown r->buf 0x%02x",
