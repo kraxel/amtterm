@@ -198,6 +198,7 @@ int main(int argc, char *argv[])
     r.cb_data  = &r;
     r.cb_recv  = recv_ider;
     r.cb_state = state_ider;
+    r.enable_options = 0x18;
 
     if (NULL != (h = getenv("AMT_PASSWORD")))
 	snprintf(r.pass, sizeof(r.pass), "%s", h);

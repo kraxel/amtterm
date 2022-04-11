@@ -67,12 +67,19 @@
 #define IDER_DATA_FROM_HOST                 0x53
 #define IDER_DATA_TO_HOST                   0x54
 
+/* IDER disable/enable features sub commands */
+#define IDER_FEATURE_GET_SUPPORTED          0x01
+#define IDER_FEATURE_GET_REGISTER_STATE     0x02
+#define IDER_FEATURE_SET_REGISTER_STATE     0x03
+#define IDER_FEATURE_ENABLE                 0x01
+
 #define START_IDER_REDIRECTION_LENGTH                 18
 #define START_IDER_REDIRECTION_REPLY_LENGTH           30 //TODO: There is a OEM Defined data field that we are assuming to be 0 bytes..
 #define END_IDER_REDIRECTION_LENGTH                   8
 #define END_IDER_REDIRECTION_REPLY_LENGTH             8
 #define IDER_RESET_OCCURED_LENGTH                     9
 #define IDER_RESET_OCCURED_RESPONSE_LENGTH            8
+#define IDER_DISABLE_ENABLE_FEATURES_LENGTH           13
 #define IDER_DISABLE_ENABLE_FEATURES_REPLY_LENGTH     13
 #define IDER_COMMAND_END_RESPONSE_LENGTH              31
 #define IDER_GET_DATA_FROM_HOST_LENGTH                31

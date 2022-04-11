@@ -44,6 +44,7 @@ static const char *state_name[] = {
     [ REDIR_INIT_SOL  ] = "INIT_SOL",
     [ REDIR_RUN_SOL   ] = "RUN_SOL",
     [ REDIR_INIT_IDER ] = "INIT_IDER",
+    [ REDIR_CFG_IDER  ] = "CFG_IDER",
     [ REDIR_RUN_IDER  ] = "RUN_IDER",
     [ REDIR_CLOSING   ] = "CLOSING",
     [ REDIR_CLOSED    ] = "CLOSED",
@@ -58,6 +59,7 @@ static const char *state_desc[] = {
     [ REDIR_INIT_SOL  ] = "serial-over-lan initialization",
     [ REDIR_RUN_SOL   ] = "serial-over-lan active",
     [ REDIR_INIT_IDER ] = "IDE redirect initialization",
+    [ REDIR_CFG_IDER  ] = "IDE redirect configuration",
     [ REDIR_RUN_IDER  ] = "IDE redirect active",
     [ REDIR_CLOSING   ] = "redirection shutdown",
     [ REDIR_CLOSED    ] = "connection closed",
@@ -314,6 +316,17 @@ int redir_sol_start(struct redir *r)
     return redir_write(r, request, sizeof(request));
 }
 
+int redir_sol_stop(struct redir *r)
+{
+    unsigned char request[END_SOL_REDIRECTION_LENGTH] = {
+	END_SOL_REDIRECTION, 0, 0, 0,
+	0, 0, 0, 0,
+    };
+
+    redir_state(r, REDIR_CLOSING);
+    return redir_write(r, request, sizeof(request));
+}
+
 int redir_ider_start(struct redir *r)
 {
     unsigned char request[START_IDER_REDIRECTION_LENGTH] = {
@@ -331,14 +344,28 @@ int redir_ider_start(struct redir *r)
     return redir_write(r, request, sizeof(request));
 }
 
-int redir_sol_stop(struct redir *r)
+int redir_ider_config(struct redir *r)
 {
-    unsigned char request[END_SOL_REDIRECTION_LENGTH] = {
-	END_SOL_REDIRECTION, 0, 0, 0,
-	0, 0, 0, 0,
+    unsigned char request[IDER_DISABLE_ENABLE_FEATURES_LENGTH] = {
+	IDER_DISABLE_ENABLE_FEATURES, 0, 0, 0,
+	r->seqno & 0xff, (r->seqno >> 8) && 0xff,
+	(r->seqno >> 16) & 0xff, (r->seqno >> 24) & 0xff,
+	IDER_FEATURE_SET_REGISTER_STATE,
+	IDER_FEATURE_ENABLE | r->enable_options, 0, 0, 0
+    };
+    r->seqno++;
+    redir_state(r, REDIR_CFG_IDER);
+    return redir_write(r, request, sizeof(request));
+}
+
+int redir_ider_reset(struct redir *r)
+{
+    unsigned char request[IDER_RESET_OCCURED_RESPONSE_LENGTH] = {
+	IDER_RESET_OCCURED_RESPONSE, 0, 0, 0,
+	r->seqno & 0xff, (r->seqno >> 8) & 0xff,
+	(r->seqno >> 16) & 0xff, (r->seqno >> 24) & 0xff,
     };
 
-    redir_state(r, REDIR_CLOSING);
     return redir_write(r, request, sizeof(request));
 }
 
@@ -574,7 +601,24 @@ repeat:
 		(unsigned int)r->buf[19] << 8;
 	    fprintf(stderr,"IDE redirection enabled, features %d iana %02x%02x%02x%02x\n",
 		    r->buf[21], r->buf[25], r->buf[26], r->buf[27], r->buf[28]);
+	    if (-1 == redir_ider_config(r))
+		goto err;
+	    break;
+	case IDER_DISABLE_ENABLE_FEATURES_REPLY:
+	    bshift = r->blen;
+	    if (r->blen < IDER_DISABLE_ENABLE_FEATURES_REPLY_LENGTH)
+		goto again;
 	    redir_state(r, REDIR_RUN_IDER);
+	    break;
+	case IDER_RESET_OCCURED:
+	    bshift = r->blen;
+	    r->seqno = (unsigned int)r->buf[4] |
+		(unsigned int)r->buf[5] << 8 |
+		(unsigned int)r->buf[6] << 16 |
+		(unsigned int)r->buf[7] << 24;
+	    fprintf(stderr, "reset, mask %u\n", r->buf[8]);
+	    if (-1 == redir_ider_reset(r))
+		goto err;
 	    break;
 	case IDER_DATA_FROM_HOST:
 	    if (r->blen < 10) /* header length */

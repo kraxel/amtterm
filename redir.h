@@ -9,7 +9,8 @@ enum redir_state {
     REDIR_INIT_SOL  = 10,
     REDIR_RUN_SOL   = 11,
     REDIR_INIT_IDER = 20,
-    REDIR_RUN_IDER  = 21,
+    REDIR_CFG_IDER  = 21,
+    REDIR_RUN_IDER  = 22,
     REDIR_CLOSING   = 30,
     REDIR_CLOSED    = 31,
     REDIR_ERROR     = 40,
@@ -34,10 +35,12 @@ struct redir {
     unsigned char     filename[256];
     unsigned int      tx_bufsize;
     unsigned int      rx_bufsize;
+    unsigned int      enable_options;
 
     int               sock;
     unsigned char     buf[64];
     unsigned int      blen;
+    unsigned int      seqno;
 
     void              *cacert;
     void              *ctx;
@@ -68,6 +71,8 @@ int redir_sol_start(struct redir *r);
 int redir_sol_stop(struct redir *r);
 int redir_sol_send(struct redir *r, unsigned char *buf, int blen);
 int redir_ider_start(struct redir *r);
+int redir_ider_config(struct redir *r);
+int redir_ider_reset(struct redir *r);
 int redir_ider_stop(struct redir *r);
 int redir_ider_send(struct redir *r, unsigned char *buf, int blen);
 int redir_data(struct redir *r);
