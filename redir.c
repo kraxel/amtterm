@@ -369,7 +369,7 @@ int redir_sol_send(struct redir *r, unsigned char *buf, int blen)
     return rc;
 }
 
-int redir_sol_recv(struct redir *r)
+int redir_recv(struct redir *r)
 {
     unsigned char msg[64];
     int count, len, bshift;
@@ -500,7 +500,7 @@ repeat:
 	case SOL_DATA_FROM_HOST:
 	    if (r->blen < 10) /* header length */
 		goto again;
-	    bshift = redir_sol_recv(r);
+	    bshift = redir_recv(r);
 	    if (bshift < 0)
 		goto err;
 	    break;
@@ -569,6 +569,19 @@ repeat:
 		goto err;
 	    }
 	    redir_state(r, REDIR_RUN_IDER);
+	    break;
+	case IDER_DATA_FROM_HOST:
+	    if (r->blen < 10) /* header length */
+		goto again;
+	    bshift = redir_recv(r);
+	    if (bshift < 0)
+		goto err;
+	    break;
+	case END_IDER_REDIRECTION_REPLY:
+	    bshift = r->blen; /* FIXME */
+	    if (r->blen < bshift)
+		goto again;
+	    redir_stop(r);
 	    break;
 	default:
 	    snprintf(r->err, sizeof(r->err), "%s: unknown r->buf 0x%02x",
