@@ -327,6 +327,69 @@ int redir_sol_stop(struct redir *r)
     return redir_write(r, request, sizeof(request));
 }
 
+int redir_sol_send(struct redir *r, unsigned char *buf, int blen)
+{
+    int len = 10+blen;
+    int rc;
+    unsigned char *request = malloc(len);
+
+    memset(request, 0, len);
+    request[0] = SOL_DATA_TO_HOST;
+    request[8] = blen & 0xff;
+    request[9] = blen >> 8;
+    memcpy(request + 10, buf, blen);
+    rc = redir_write(r, request, len);
+    free(request);
+    return rc;
+}
+
+int redir_sol_recv(struct redir *r)
+{
+    unsigned char msg[64];
+    int count, len, bshift;
+    int flags;
+
+    len = r->buf[8] + (r->buf[9] << 8);
+    count = r->blen - 10;
+    if (count > len)
+	count = len;
+    bshift = count + 10;
+    if (r->cb_recv)
+	r->cb_recv(r->cb_data, r->buf + 10, count);
+    len -= count;
+
+    while (len) {
+	if (r->trace)
+	    fprintf(stderr, "in+: need %d more data bytes\n", len);
+	count = sizeof(msg);
+	if (count > len)
+	    count = len;
+	/* temporarily switch to blocking.  the actual data may not be
+	   ready yet, but should be here Real Soon Now. */
+	flags = fcntl(r->sock,F_GETFL);
+	fcntl(r->sock,F_SETFL, flags & (~O_NONBLOCK));
+	count = sslread(r->ctx, msg, count);
+	fcntl(r->sock,F_SETFL, flags);
+
+	switch (count) {
+	case -1:
+	    snprintf(r->err, sizeof(r->err), "read(socket): %s", strerror(errno));
+	    return -1;
+	case 0:
+	    snprintf(r->err, sizeof(r->err), "EOF from socket");
+	    return -1;
+	default:
+	    if (r->trace)
+		hexdump("in+", msg, count);
+	    if (r->cb_recv)
+		r->cb_recv(r->cb_data, msg, count);
+	    len -= count;
+	}
+    }
+
+    return bshift;
+}
+
 int redir_ider_start(struct redir *r)
 {
     unsigned char request[START_IDER_REDIRECTION_LENGTH] = {
@@ -380,23 +443,7 @@ int redir_ider_stop(struct redir *r)
     return redir_write(r, request, sizeof(request));
 }
 
-int redir_sol_send(struct redir *r, unsigned char *buf, int blen)
-{
-    int len = 10+blen;
-    int rc;
-    unsigned char *request = malloc(len);
-
-    memset(request, 0, len);
-    request[0] = SOL_DATA_TO_HOST;
-    request[8] = blen & 0xff;
-    request[9] = blen >> 8;
-    memcpy(request + 10, buf, blen);
-    rc = redir_write(r, request, len);
-    free(request);
-    return rc;
-}
-
-int redir_recv(struct redir *r)
+int redir_ider_recv(struct redir *r)
 {
     unsigned char msg[64];
     int count, len, bshift;
@@ -527,7 +574,7 @@ repeat:
 	case SOL_DATA_FROM_HOST:
 	    if (r->blen < 10) /* header length */
 		goto again;
-	    bshift = redir_recv(r);
+	    bshift = redir_sol_recv(r);
 	    if (bshift < 0)
 		goto err;
 	    break;
@@ -623,7 +670,7 @@ repeat:
 	case IDER_DATA_FROM_HOST:
 	    if (r->blen < 10) /* header length */
 		goto again;
-	    bshift = redir_recv(r);
+	    bshift = redir_ider_recv(r);
 	    if (bshift < 0)
 		goto err;
 	    break;
