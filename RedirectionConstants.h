@@ -59,6 +59,7 @@
 #define IDER_RESET_OCCURED_RESPONSE         0x47
 #define IDER_DISABLE_ENABLE_FEATURES        0x48
 #define IDER_DISABLE_ENABLE_FEATURES_REPLY  0x49
+#define IDER_ERROR_OCCURED                  0x4A
 #define IDER_HEARTBEAT                      0x4B
 #define IDER_COMMAND_WRITTEN                0x50
 #define IDER_COMMAND_END_RESPONSE           0x51

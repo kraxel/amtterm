@@ -20,7 +20,7 @@ CFLAGS	+= -Wall -Wno-pointer-sign
 CFLAGS	+= -DVERSION='"$(VERSION)"'
 CFLAGS  += $(SSL_DEFS)
 
-TARGETS	:= amtterm
+TARGETS	:= amtterm amtider
 DESKTOP := $(wildcard *.desktop)
 
 all: build
@@ -74,6 +74,7 @@ distclean: clean
 #################################################################
 
 amtterm: amtterm.o redir.o tcp.o auth.o ssl.o
+amtider: amtider.o redir.o tcp.o auth.o ssl.o
 gamt: gamt.o redir.o tcp.o parseconfig.o auth.o ssl.o
 
 #################################################################

@@ -30,6 +30,9 @@ struct redir {
     enum redir_state  state;
     unsigned char     err[128]; // state == REDIR_ERROR
 
+    /* ide-redirection */
+    unsigned char     filename[256];
+
     int               sock;
     unsigned char     buf[64];
     unsigned int      blen;
@@ -62,4 +65,8 @@ int redir_sol_start(struct redir *r);
 int redir_sol_stop(struct redir *r);
 int redir_sol_send(struct redir *r, unsigned char *buf, int blen);
 int redir_sol_recv(struct redir *r);
+int redir_ider_start(struct redir *r);
+int redir_ider_stop(struct redir *r);
+int redir_ider_send(struct redir *r, unsigned char *buf, int blen);
+int redir_ider_recv(struct redir *r);
 int redir_data(struct redir *r);

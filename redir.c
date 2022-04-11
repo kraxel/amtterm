@@ -314,6 +314,23 @@ int redir_sol_start(struct redir *r)
     return redir_write(r, request, sizeof(request));
 }
 
+int redir_ider_start(struct redir *r)
+{
+    unsigned char request[START_IDER_REDIRECTION_LENGTH] = {
+	START_IDER_REDIRECTION,
+	TRANSMIT_BUFFER_TIMEOUT & 0xff,
+	TRANSMIT_BUFFER_TIMEOUT >> 8,
+	HOST_SESSION_RX_TIMEOUT & 0xff,
+	HOST_SESSION_RX_TIMEOUT >> 8,
+	HEARTBEAT_INTERVAL & 0xff,
+	HEARTBEAT_INTERVAL >> 8,
+	1, 0, 0, 0
+    };
+
+    redir_state(r, REDIR_INIT_IDER);
+    return redir_write(r, request, sizeof(request));
+}
+
 int redir_sol_stop(struct redir *r)
 {
     unsigned char request[END_SOL_REDIRECTION_LENGTH] = {
