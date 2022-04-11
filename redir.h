@@ -32,6 +32,8 @@ struct redir {
 
     /* ide-redirection */
     unsigned char     filename[256];
+    unsigned int      tx_bufsize;
+    unsigned int      rx_bufsize;
 
     int               sock;
     unsigned char     buf[64];

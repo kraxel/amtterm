@@ -568,6 +568,12 @@ repeat:
 		snprintf(r->err, sizeof(r->err), "IDE redirection failed");
 		goto err;
 	    }
+	    r->tx_bufsize = (unsigned int)r->buf[16] |
+		(unsigned int)r->buf[17] << 8;
+	    r->rx_bufsize = (unsigned int)r->buf[18] |
+		(unsigned int)r->buf[19] << 8;
+	    fprintf(stderr,"IDE redirection enabled, features %d iana %02x%02x%02x%02x\n",
+		    r->buf[21], r->buf[25], r->buf[26], r->buf[27], r->buf[28]);
 	    redir_state(r, REDIR_RUN_IDER);
 	    break;
 	case IDER_DATA_FROM_HOST:
@@ -581,7 +587,11 @@ repeat:
 	    bshift = r->blen; /* FIXME */
 	    if (r->blen < bshift)
 		goto again;
-	    redir_stop(r);
+	    redir_state(r, REDIR_CLOSED);
+	    sslexit(r->ctx);
+	    r->ctx = NULL;
+	    close(r->sock);
+	    r->sock = -1;
 	    break;
 	default:
 	    snprintf(r->err, sizeof(r->err), "%s: unknown r->buf 0x%02x",

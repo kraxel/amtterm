@@ -27,6 +27,7 @@
 #include <termios.h>
 #include <signal.h>
 #include <sys/ioctl.h>
+#include <sys/signalfd.h>
 
 #include "redir.h"
 
@@ -70,6 +71,24 @@ static int redir_loop(struct redir *r)
 {
     struct timeval tv;
     fd_set set;
+    sigset_t mask;
+    int max_fd = r->sock, sfd;
+    int interval = HEARTBEAT_INTERVAL * 4 / 1000;
+
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGINT);
+    sigaddset(&mask, SIGQUIT);
+
+    if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1) {
+	perror("sigprocmask");
+	exit(1);
+    }
+    sfd = signalfd(-1, &mask, 0);
+    if (sfd < 0) {
+	perror("signalfd");
+	exit(1);
+    }
+
 
     for(;;) {
 	if (r->state == REDIR_CLOSED ||
@@ -77,10 +96,14 @@ static int redir_loop(struct redir *r)
 	    break;
 
 	FD_ZERO(&set);
-	FD_SET(r->sock,&set);
-	tv.tv_sec  = HEARTBEAT_INTERVAL * 4 / 1000;
+	FD_SET(r->sock, &set);
+	if (sfd > 0) {
+	    FD_SET(sfd, &set);
+	    max_fd = sfd > r->sock? sfd : r->sock;
+	}
+	tv.tv_sec  = interval;
 	tv.tv_usec = 0;
-	switch (select(r->sock+1,&set,NULL,NULL,&tv)) {
+	switch (select(max_fd+1,&set,NULL,NULL,&tv)) {
 	case -1:
 	    perror("select");
 	    return -1;
@@ -92,6 +115,14 @@ static int redir_loop(struct redir *r)
 	if (FD_ISSET(r->sock,&set)) {
 	    if (-1 == redir_data(r))
 		return -1;
+	}
+	if (FD_ISSET(sfd, &set)) {
+	    close(sfd);
+	    sfd = -1;
+	    if (-1 == redir_ider_stop(r))
+		return -1;
+	    interval = 2;
+	    fprintf(stderr, "Wait %d seconds for reply\n", interval);
 	}
     }
     return 0;
