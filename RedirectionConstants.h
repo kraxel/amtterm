@@ -76,8 +76,8 @@
 #define IDER_COMMAND_END_RESPONSE_LENGTH              31
 #define IDER_GET_DATA_FROM_HOST_LENGTH                31
 
-static const unsigned int SOL_SESSION = 0x204C4F53;
-static const unsigned int IDER_SESSION = 0x52454449;
+static const unsigned int SOL_SESSION = 0x204C4F53;  /* "SOL " */
+static const unsigned int IDER_SESSION = 0x52454449; /* "IDER" */
 
 static const unsigned short MAX_TRANSMIT_BUFFER = 1000;
 static const unsigned short TRANSMIT_BUFFER_TIMEOUT = 100;
