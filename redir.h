@@ -26,12 +26,16 @@ struct redir {
     unsigned char     type[4];
     int               verbose;
     int               trace;
+    int               legacy;
     enum redir_state  state;
     unsigned char     err[128]; // state == REDIR_ERROR
 
     int               sock;
     unsigned char     buf[64];
     unsigned int      blen;
+
+    void              *cacert;
+    void              *ctx;
 
     /* callbacks */
     void *cb_data;
