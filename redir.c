@@ -342,6 +342,17 @@ int redir_sol_stop(struct redir *r)
     return redir_write(r, request, sizeof(request));
 }
 
+int redir_ider_stop(struct redir *r)
+{
+    unsigned char request[END_IDER_REDIRECTION_LENGTH] = {
+	END_IDER_REDIRECTION, 0, 0, 0,
+	0, 0, 0, 0,
+    };
+
+    redir_state(r, REDIR_CLOSING);
+    return redir_write(r, request, sizeof(request));
+}
+
 int redir_sol_send(struct redir *r, unsigned char *buf, int blen)
 {
     int len = 10+blen;
@@ -457,7 +468,13 @@ repeat:
 		snprintf(r->err, sizeof(r->err), "session authentication failed");
 		goto err;
 	    }
-	    if (-1 == redir_sol_start(r))
+	    if (!memcmp(r->type, "SOL ", 4)) {
+		if (-1 == redir_sol_start(r))
+		    goto err;
+	    } else if (!memcmp(r->type, "IDER", 4)) {
+		if (-1 == redir_ider_start(r))
+		    goto err;
+	    } else
 		goto err;
 	    break;
 	case START_SOL_REDIRECTION_REPLY:
@@ -543,6 +560,16 @@ repeat:
 	    }
 	    break;
 	}
+	case START_IDER_REDIRECTION_REPLY:
+	    bshift = r->blen; /* FIXME */
+	    if (r->blen < bshift)
+		goto again;
+	    if (r->buf[1] != STATUS_SUCCESS) {
+		snprintf(r->err, sizeof(r->err), "IDE redirection failed");
+		goto err;
+	    }
+	    redir_state(r, REDIR_RUN_IDER);
+	    break;
 	default:
 	    snprintf(r->err, sizeof(r->err), "%s: unknown r->buf 0x%02x",
 		     __FUNCTION__, r->buf[0]);
