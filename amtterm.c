@@ -107,11 +107,11 @@ static int redir_loop(struct redir *r)
 		    if (r->verbose)
 			fprintf(stderr, "\n" APPNAME ": saw ^], exiting\n");
 		    redir_sol_stop(r);
-                }
-                for (i = 0; i < rc; i++) {
-                    /* meet BIOS expectations */
-                    if (buf[i] == 0x0a)
-                        buf[i] = 0x0d;
+		}
+		for (i = 0; i < rc; i++) {
+		    /* meet BIOS expectations */
+		    if (buf[i] == 0x0a)
+			buf[i] = 0x0d;
 		}
 		if (-1 == redir_sol_send(r, buf, rc))
 		    return -1;
@@ -170,23 +170,23 @@ static void tty_restore(void)
 static void usage(FILE *fp)
 {
     fprintf(fp,
-            "\n"
+	    "\n"
 	    "This is " APPNAME ", release " VERSION ", I'll establish\n"
 	    "serial-over-lan (sol) connections to your Intel AMT boxes.\n"
-            "\n"
-            "usage: " APPNAME " [options] host [port]\n"
-            "options:\n"
-            "   -h            print this text\n"
-            "   -v            verbose (default)\n"
-            "   -q            quiet\n"
-            "   -u user       username (default: admin)\n"
-            "   -p pass       password (default: $AMT_PASSWORD)\n"
-            "\n"
-            "By default port 16994 is used.\n"
+	    "\n"
+	    "usage: " APPNAME " [options] host [port]\n"
+	    "options:\n"
+	    "   -h            print this text\n"
+	    "   -v            verbose (default)\n"
+	    "   -q            quiet\n"
+	    "   -u user       username (default: admin)\n"
+	    "   -p pass       password (default: $AMT_PASSWORD)\n"
+	    "\n"
+	    "By default port 16994 is used.\n"
 	    "If no password is given " APPNAME " will ask for one.\n"
-            "\n"
-            "-- \n"
-            "(c) 2007 Gerd Hoffmann <kraxel@redhat.com>\n"
+	    "\n"
+	    "-- \n"
+	    "(c) 2007 Gerd Hoffmann <kraxel@redhat.com>\n"
 	    "\n");
 }
 
@@ -209,9 +209,9 @@ int main(int argc, char *argv[])
 	snprintf(r.pass, sizeof(r.pass), "%s", h);
 
     for (;;) {
-        if (-1 == (c = getopt(argc, argv, "hvqu:p:")))
-            break;
-        switch (c) {
+	if (-1 == (c = getopt(argc, argv, "hvqu:p:")))
+	    break;
+	switch (c) {
 	case 'v':
 	    r.verbose = 1;
 	    break;
@@ -226,13 +226,13 @@ int main(int argc, char *argv[])
 	    memset(optarg,'*',strlen(optarg)); /* rm passwd from ps list */
 	    break;
 
-        case 'h':
-            usage(stdout);
-            exit(0);
-        default:
-            usage(stderr);
-            exit(1);
-        }
+	case 'h':
+	    usage(stdout);
+	    exit(0);
+	default:
+	    usage(stderr);
+	    exit(1);
+	}
     }
 
     if (optind < argc)
