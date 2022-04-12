@@ -114,6 +114,7 @@ struct __attribute__ ((__packed__)) ider_data_to_host_message {
     unsigned char sense;
     unsigned char asc;
     unsigned char asq;
+    unsigned char rsvd2[3];
 };
 
 const char *redir_state_name(enum redir_state state);

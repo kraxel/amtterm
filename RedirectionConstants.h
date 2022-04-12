@@ -78,7 +78,7 @@
 #define IDER_ERROR_MASK                     0x02
 #define IDER_SECTOR_COUNT_MASK              0x04
 #define IDER_SECTOR_NUM_MASK                0x08
-#define IDER_BYTE_CNT_LSG_MASK              0x10
+#define IDER_BYTE_CNT_LSB_MASK              0x10
 #define IDER_BYTE_CNT_MSB_MASK              0x20
 #define IDER_DRIVE_SELECT_MASK              0x40
 #define IDER_STATUS_MASK                    0x80
@@ -88,8 +88,8 @@
 #define IDER_STATUS_DRDY                    0x40
 #define IDER_STATUS_DF                      0x20
 #define IDER_STATUS_DSC                     0x10
-#define IDER_STATUS_DRQ                     0x80
-#define IDER_STATUS_CORR                    0x40
+#define IDER_STATUS_DRQ                     0x08
+#define IDER_STATUS_CORR                    0x04
 #define IDER_STATUS_IDX                     0x02
 #define IDER_STATUS_ERR                     0x01
 

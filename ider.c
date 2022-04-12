@@ -18,10 +18,45 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <sys/types.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 #include <scsi/scsi.h>
 #include "redir.h"
+
+static int ider_data_to_host(struct redir *r, unsigned int seqno,
+			     unsigned char *data, unsigned int data_len)
+{
+    unsigned char device = 0xb0;
+    unsigned char *request;
+    int ret;
+    unsigned char mask = IDER_STATUS_MASK | IDER_SECTOR_COUNT_MASK |
+	IDER_INTERRUPT_MASK;
+    struct ider_data_to_host_message msg = {
+	.type = IDER_DATA_TO_HOST,
+	.input.mask = mask | IDER_BYTE_CNT_LSB_MASK | IDER_BYTE_CNT_MSB_MASK,
+	.input.sector_count = IDER_INTERRUPT_IO,
+	.input.byte_count_lsb = (data_len & 0xff),
+	.input.byte_count_msb = (data_len >> 8) & 0xff,
+	.input.drive_select = device,
+	.input.status = IDER_STATUS_DRDY | IDER_STATUS_DSC | IDER_STATUS_DRQ,
+	.output.mask = mask,
+	.output.sector_count = IDER_INTERRUPT_CD | IDER_INTERRUPT_CD,
+	.output.drive_select = device,
+	.output.status = IDER_STATUS_DRDY | IDER_STATUS_DSC,
+    };
+
+    memcpy(&msg.transfer_bytes, &data_len, 2);
+    memcpy(&msg.sequence_number, &seqno, 4);
+    request = malloc(sizeof(msg) + data_len);
+    memcpy(request, &msg, sizeof(msg));
+    memcpy(request + sizeof(msg), data, data_len);
+
+    ret = redir_write(r, request, sizeof(msg) + data_len);
+    free(request);
+    return ret;
+}
 
 static int ider_packet_sense(struct redir *r, unsigned int seqno,
 			     unsigned char device, unsigned char sense,
@@ -52,6 +87,7 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 			unsigned char *cdb)
 {
     unsigned char device = 0xb0;
+    unsigned char resp[512];
 
     if (!r->filename)
 	/* NOT READY, MEDIUM NOT PRESENT */
@@ -60,9 +96,18 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
     switch (cdb[0]) {
     case TEST_UNIT_READY:
 	return ider_packet_sense(r, seqno, device, 0, 0, 0);
+    case MODE_SENSE_6:
+	if (cdb[2] != 0x3f || cdb[3] != 0x00)
+	    return ider_packet_sense(r, seqno, device, 0x05, 0x24, 0x00);
+	resp[0] = 0;
+	resp[1] = 0x05;
+	resp[2] = 0x80;
+	resp[3] = 0;
+	return ider
     default:
 	break;
     }
+    fprintf(stderr, "seqno %u: unhandled command %02x\n", seqno, cdb[0]);
     /* ILLEGAL REQUEST, CDB NOT SUPPORTED */
     return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
 }
