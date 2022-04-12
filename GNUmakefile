@@ -75,7 +75,7 @@ distclean: clean
 
 amtterm: amtterm.o redir.o tcp.o auth.o ssl.o ider.o
 amtider: amtider.o redir.o tcp.o auth.o ssl.o ider.o
-gamt: gamt.o redir.o tcp.o parseconfig.o auth.o ssl.o
+gamt: gamt.o redir.o tcp.o parseconfig.o auth.o ssl.o ider.o
 
 #################################################################
 

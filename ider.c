@@ -96,14 +96,14 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
     switch (cdb[0]) {
     case TEST_UNIT_READY:
 	return ider_packet_sense(r, seqno, device, 0, 0, 0);
-    case MODE_SENSE_6:
+    case MODE_SENSE:
 	if (cdb[2] != 0x3f || cdb[3] != 0x00)
 	    return ider_packet_sense(r, seqno, device, 0x05, 0x24, 0x00);
 	resp[0] = 0;
 	resp[1] = 0x05;
 	resp[2] = 0x80;
 	resp[3] = 0;
-	return ider
+	return ider_data_to_host(r, seqno, resp, 4);
     default:
 	break;
     }
