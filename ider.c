@@ -88,9 +88,8 @@ static int ider_packet_sense(struct redir *r, unsigned int seqno,
 }    
 
 int ider_handle_command(struct redir *r, unsigned int seqno,
-			unsigned char *cdb)
+			unsigned char device, unsigned char *cdb)
 {
-    unsigned char device = 0xb0;
     unsigned char resp[512];
     uint32_t lba, sector_size;
 

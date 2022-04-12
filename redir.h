@@ -140,4 +140,4 @@ int redir_data(struct redir *r);
 ssize_t redir_write(struct redir *r, const char *buf, size_t count);
 
 int ider_handle_command(struct redir *r, unsigned int seqno,
-			unsigned char *cdb);
+			unsigned char device, unsigned char *cdb);

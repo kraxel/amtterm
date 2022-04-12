@@ -447,6 +447,7 @@ static int redir_ider_command(struct redir *r, unsigned int seqno)
 {
     struct ider_command_written_message *msg =
 	(struct ider_command_written_message *)r->buf;
+    unsigned char device = msg->drive_select & 0x10 ? 0xb0 : 0xa0;
     int i;
 
     if (msg->command != 0xa0) {
@@ -459,7 +460,7 @@ static int redir_ider_command(struct redir *r, unsigned int seqno)
 	fprintf(stderr, "%02x ", msg->packet_data[i]);
     fprintf(stderr, "\n");
 
-    return ider_handle_command(r, seqno, msg->packet_data);
+    return ider_handle_command(r, seqno, device, msg->packet_data);
 }
 
 int redir_ider_recv(struct redir *r)
