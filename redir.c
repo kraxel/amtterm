@@ -99,7 +99,7 @@ static void hexdump(const char *prefix, const unsigned char *data, size_t size)
     }
 }
 
-static ssize_t redir_write(struct redir *r, const char *buf, size_t count)
+ssize_t redir_write(struct redir *r, const char *buf, size_t count)
 {
     int rc;
 
@@ -416,17 +416,17 @@ int redir_ider_config(struct redir *r)
 	IDER_FEATURE_SET_REGISTER_STATE,
 	IDER_FEATURE_ENABLE | r->enable_options, 0, 0, 0
     };
-    r->seqno++;
     redir_state(r, REDIR_CFG_IDER);
+    r->seqno++;
     return redir_write(r, request, sizeof(request));
 }
 
-int redir_ider_reset(struct redir *r)
+int redir_ider_reset(struct redir *r, unsigned int seqno)
 {
     unsigned char request[IDER_RESET_OCCURED_RESPONSE_LENGTH] = {
 	IDER_RESET_OCCURED_RESPONSE, 0, 0, 0,
-	r->seqno & 0xff, (r->seqno >> 8) & 0xff,
-	(r->seqno >> 16) & 0xff, (r->seqno >> 24) & 0xff,
+	seqno & 0xff, (seqno >> 8) & 0xff,
+	(seqno >> 16) & 0xff, (seqno >> 24) & 0xff,
     };
 
     return redir_write(r, request, sizeof(request));
@@ -441,6 +441,25 @@ int redir_ider_stop(struct redir *r)
 
     redir_state(r, REDIR_CLOSING);
     return redir_write(r, request, sizeof(request));
+}
+
+static int redir_ider_command(struct redir *r, unsigned int seqno)
+{
+    struct ider_command_written_message *msg =
+	(struct ider_command_written_message *)r->buf;
+    int i;
+
+    if (msg->command != 0xa0) {
+	snprintf(r->err, sizeof(r->err), "Unhandled IDE command %02x",
+		 msg->command);
+	return -1;
+    }
+    fprintf(stderr, "command %02x: ", msg->command);
+    for (i = 0; i < sizeof(msg->packet_data); i++)
+	fprintf(stderr, "%02x ", msg->packet_data[i]);
+    fprintf(stderr, "\n");
+
+    return ider_handle_command(r, seqno, msg->packet_data);
 }
 
 int redir_ider_recv(struct redir *r)
@@ -490,12 +509,21 @@ int redir_ider_recv(struct redir *r)
     return bshift;
 }
 
+static inline unsigned int redir_hdr_seqno(struct redir *r)
+{
+    return (unsigned int)r->buf[4] |
+	(unsigned int)r->buf[5] << 8 |
+	(unsigned int)r->buf[6] << 16 |
+	(unsigned int)r->buf[7] << 24;
+}
+
 static int in_loopback_mode = 0;
 static int powered_off = 0;
 
 int redir_data(struct redir *r)
 {
     int rc, bshift;
+    unsigned int seqno;
 
 repeat:
     if (r->trace) {
@@ -655,16 +683,23 @@ repeat:
 	    bshift = r->blen;
 	    if (r->blen < IDER_DISABLE_ENABLE_FEATURES_REPLY_LENGTH)
 		goto again;
+	    if (r->seqno != redir_hdr_seqno(r))
+		goto err;
 	    redir_state(r, REDIR_RUN_IDER);
 	    break;
 	case IDER_RESET_OCCURED:
 	    bshift = r->blen;
-	    r->seqno = (unsigned int)r->buf[4] |
-		(unsigned int)r->buf[5] << 8 |
-		(unsigned int)r->buf[6] << 16 |
-		(unsigned int)r->buf[7] << 24;
-	    fprintf(stderr, "reset, mask %u\n", r->buf[8]);
-	    if (-1 == redir_ider_reset(r))
+	    seqno = redir_hdr_seqno(r);
+	    fprintf(stderr, "seqno %u: reset, mask %u\n", seqno, r->buf[8]);
+	    if (-1 == redir_ider_reset(r, seqno))
+		goto err;
+	    break;
+	case IDER_COMMAND_WRITTEN:
+	    bshift = r->blen;
+	    if (r->blen < sizeof(struct ider_command_written_message))
+		goto again;
+	    seqno = redir_hdr_seqno(r);
+	    if (-1 == redir_ider_command(r, seqno))
 		goto err;
 	    break;
 	case IDER_DATA_FROM_HOST:

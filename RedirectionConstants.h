@@ -73,6 +73,30 @@
 #define IDER_FEATURE_SET_REGISTER_STATE     0x03
 #define IDER_FEATURE_ENABLE                 0x01
 
+/* IDER output register mask values */
+#define IDER_INTERRUPT_MASK                 0x01
+#define IDER_ERROR_MASK                     0x02
+#define IDER_SECTOR_COUNT_MASK              0x04
+#define IDER_SECTOR_NUM_MASK                0x08
+#define IDER_BYTE_CNT_LSG_MASK              0x10
+#define IDER_BYTE_CNT_MSB_MASK              0x20
+#define IDER_DRIVE_SELECT_MASK              0x40
+#define IDER_STATUS_MASK                    0x80
+
+/* IDER status register mask values */
+#define IDER_STATUS_BSY                     0x80
+#define IDER_STATUS_DRDY                    0x40
+#define IDER_STATUS_DF                      0x20
+#define IDER_STATUS_DSC                     0x10
+#define IDER_STATUS_DRQ                     0x80
+#define IDER_STATUS_CORR                    0x40
+#define IDER_STATUS_IDX                     0x02
+#define IDER_STATUS_ERR                     0x01
+
+/* IDER interrupt reason mask values */
+#define IDER_INTERRUPT_IO                   0x02
+#define IDER_INTERRUPT_CD                   0x01
+
 #define START_IDER_REDIRECTION_LENGTH                 18
 #define START_IDER_REDIRECTION_REPLY_LENGTH           30 //TODO: There is a OEM Defined data field that we are assuming to be 0 bytes..
 #define END_IDER_REDIRECTION_LENGTH                   8

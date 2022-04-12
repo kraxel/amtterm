@@ -36,6 +36,8 @@ struct redir {
     unsigned int      tx_bufsize;
     unsigned int      rx_bufsize;
     unsigned int      enable_options;
+    unsigned int      tx_length;
+    unsigned int      tx_offset;
 
     int               sock;
     unsigned char     buf[64];
@@ -59,6 +61,61 @@ struct __attribute__ ((__packed__)) controls_from_host_message {
     unsigned char status;
 };
 
+struct __attribute__ ((__packed__)) ider_command_written_message {
+    unsigned char type;
+    unsigned char reserved[3];
+    uint32_t      sequence_number;
+    unsigned char cable_sel;          /* 8 */
+    unsigned char feature;            /* 9 */
+    unsigned char sector_count;       /* 10 */
+    unsigned char sector_number;      /* 11 */
+    uint16_t      byte_count;         /* 12 */
+    unsigned char drive_select;       /* 14 */
+    unsigned char command;            /* 15 */
+    unsigned char packet_data[12];    /* 16 */
+};
+
+struct __attribute__ ((__packed__)) ider_data_regs {
+    unsigned char mask;
+    unsigned char error;
+    unsigned char sector_count;
+    unsigned char sector_num;
+    unsigned char byte_count_lsb;
+    unsigned char byte_count_msb;
+    unsigned char drive_select;
+    unsigned char status;
+};
+
+struct __attribute__ ((__packed__)) ider_command_response_message {
+    unsigned char type;
+    unsigned char reserved[2];
+    unsigned char attributes;
+    uint32_t      sequence_number;
+    unsigned char cable_sel;         /* unused */
+    uint16_t      transfer_bytes;
+    unsigned char packet_num;        /* unused */
+    unsigned char input_regs[8];     /* unused */
+    struct ider_data_regs output;
+    unsigned char sense;
+    unsigned char asc;
+    unsigned char asq;
+};
+
+struct __attribute__ ((__packed__)) ider_data_to_host_message {
+    unsigned char type;
+    unsigned char reserved[2];
+    unsigned char attributes;
+    uint32_t      sequence_number;
+    unsigned char cable_sel;         /* unused */
+    uint16_t      transfer_bytes;
+    unsigned char packet_num;        /* unused */
+    struct ider_data_regs input;
+    struct ider_data_regs output;
+    unsigned char sense;
+    unsigned char asc;
+    unsigned char asq;
+};
+
 const char *redir_state_name(enum redir_state state);
 const char *redir_state_desc(enum redir_state state);
 
@@ -72,8 +129,12 @@ int redir_sol_send(struct redir *r, unsigned char *buf, int blen);
 int redir_sol_recv(struct redir *r);
 int redir_ider_start(struct redir *r);
 int redir_ider_config(struct redir *r);
-int redir_ider_reset(struct redir *r);
+int redir_ider_reset(struct redir *r, unsigned int seqno);
 int redir_ider_stop(struct redir *r);
 int redir_ider_send(struct redir *r, unsigned char *buf, int blen);
 int redir_ider_recv(struct redir *r);
 int redir_data(struct redir *r);
+ssize_t redir_write(struct redir *r, const char *buf, size_t count);
+
+int ider_handle_command(struct redir *r, unsigned int seqno,
+			unsigned char *cdb);
