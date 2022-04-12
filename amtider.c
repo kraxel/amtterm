@@ -26,8 +26,11 @@
 #include <fcntl.h>
 #include <termios.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/signalfd.h>
+#include <sys/mman.h>
 
 #include "redir.h"
 
@@ -188,7 +191,8 @@ int main(int argc, char *argv[])
 {
     struct redir r;
     char *h;
-    int c;
+    int c, fd;
+    struct stat st;
 
     memset(&r, 0, sizeof(r));
     r.verbose = 1;
@@ -204,7 +208,7 @@ int main(int argc, char *argv[])
 	snprintf(r.pass, sizeof(r.pass), "%s", h);
 
     for (;;) {
-	if (-1 == (c = getopt(argc, argv, "hvqu:p:LC:")))
+	if (-1 == (c = getopt(argc, argv, "f:hvqu:p:LC:")))
 	    break;
 	switch (c) {
 	case 'v':
@@ -241,12 +245,39 @@ int main(int argc, char *argv[])
 	}
     }
 
-    if (optind < argc)
+    if (optind < argc) {
 	snprintf(r.host, sizeof(r.host), "%s", argv[optind]);
-    if (optind+1 < argc)
-	snprintf(r.port, sizeof(r.port), "%s", argv[optind+1]);
+	optind++;
+    }
+    if (optind < argc) {
+	snprintf(r.port, sizeof(r.port), "%s", argv[optind]);
+	optind++;
+    }
     if (0 == strlen(r.host)) {
 	usage(stderr);
+	exit(1);
+    }
+
+    if (0 == strlen(r.filename)) {
+	usage(stderr);
+	exit(1);
+    }
+
+    if (stat(r.filename, &st) < 0) {
+	perror("stat");
+	exit(1);
+    }
+    r.mmap_size = st.st_size;
+    fd = open(r.filename, O_RDONLY);
+    if (fd < 0) {
+	perror("open");
+	exit(1);
+    }
+    r.mmap_buf = mmap(NULL, r.mmap_size, PROT_READ,
+		      MAP_PRIVATE, fd, 0);
+    close(fd);
+    if (r.mmap_buf == MAP_FAILED) {
+	perror("mmap");
 	exit(1);
     }
 
@@ -269,6 +300,7 @@ int main(int argc, char *argv[])
 
     redir_start(&r);
     redir_loop(&r);
+    munmap(r.mmap_buf, r.mmap_size);
 
     exit(0);
 }
