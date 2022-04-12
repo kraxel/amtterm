@@ -173,7 +173,10 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 {
     unsigned char resp[512];
     unsigned char *mode_sense = NULL;
-    uint32_t lba, sector_size, mode_len;
+    uint32_t lba, sector_size, mode_len, resp_len;
+    unsigned int lba_size, offset;
+    bool last_lba = false;
+    int ret = 0;
 
     if (!r->mmap_size)
 	/* NOT READY, MEDIUM NOT PRESENT */
@@ -259,6 +262,31 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	resp[6] = (sector_size >>  8) & 0xff;
 	resp[7] = sector_size & 0xff;
 	return ider_data_to_host(r, seqno, device, resp, 8, true);
+    case READ_10:
+	if (device == 0xa0) {
+	    /* NOT READY, MEDIUM NOT PRESENT */
+	    return ider_packet_sense(r, seqno, device, 0x02, 0x3a, 0x0);
+	}
+	lba = (unsigned int)cdb[2] << 24 |
+	    (unsigned int)cdb[3] << 16 |
+	    (unsigned int)cdb[4] << 8 |
+	    (unsigned int)cdb[5];
+	resp_len = (unsigned int)cdb[7] << 8 | (unsigned int)cdb[8];
+	lba_size = 1 << 11;
+	last_lba = false;
+	for (offset = 0; offset < resp_len; offset += lba_size) {
+	    unsigned char *lba_ptr =
+		(unsigned char *)r->mmap_buf + lba + offset;
+	    if (lba_size >= (resp_len - offset)) {
+		lba_size = (resp_len - offset);
+		last_lba = true;
+	    }
+	    ret = ider_data_to_host(r, seqno, device, lba_ptr,
+				    lba_size, last_lba);
+	    if (ret < 0)
+		return ret;
+	}
+	return ret;
     default:
 	break;
     }
