@@ -171,6 +171,8 @@ static void usage(FILE *fp)
 	    "   -h            print this text\n"
 	    "   -v            verbose (default)\n"
 	    "   -q            quiet\n"
+	    "   -g            start redirection gracefully\n"
+	    "   -r            start redirection on reboot\n"
 	    "   -f file       file to use as device data\n"
 	    "   -L            use legacy authentication\n"
 #if defined(USE_OPENSSL) || defined(USE_GNUTLS)
@@ -202,14 +204,14 @@ int main(int argc, char *argv[])
     r.cb_data  = &r;
     r.cb_recv  = recv_ider;
     r.cb_state = state_ider;
-    r.enable_options = 0x18;
+    r.enable_options = IDER_START_NOW;
     r.lba_size = (unsigned int)1 << 11;
 
     if (NULL != (h = getenv("AMT_PASSWORD")))
 	snprintf(r.pass, sizeof(r.pass), "%s", h);
 
     for (;;) {
-	if (-1 == (c = getopt(argc, argv, "f:hvqu:p:LC:")))
+	if (-1 == (c = getopt(argc, argv, "f:ghvqu:p:LC:")))
 	    break;
 	switch (c) {
 	case 'v':
@@ -223,6 +225,12 @@ int main(int argc, char *argv[])
 	    break;
 	case 'u':
 	    snprintf(r.user, sizeof(r.user), "%s", optarg);
+	    break;
+	case 'g':
+	    r.enable_options = IDER_START_GRACEFUL;
+	    break;
+	case 'r':
+	    r.enable_options = IDER_START_ONREBOOT;
 	    break;
 	case 'p':
 	    snprintf(r.pass, sizeof(r.pass), "%s", optarg);

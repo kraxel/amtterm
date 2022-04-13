@@ -97,6 +97,11 @@
 #define IDER_INTERRUPT_IO                   0x02
 #define IDER_INTERRUPT_CD                   0x01
 
+/* IDER start modes */
+#define IDER_START_ONREBOOT                 0x08
+#define IDER_START_GRACEFUL                 0x10
+#define IDER_START_NOW                      0x18
+
 #define START_IDER_REDIRECTION_LENGTH                 18
 #define START_IDER_REDIRECTION_REPLY_LENGTH           30 //TODO: There is a OEM Defined data field that we are assuming to be 0 bytes..
 #define END_IDER_REDIRECTION_LENGTH                   8
