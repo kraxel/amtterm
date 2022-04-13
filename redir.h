@@ -1,5 +1,6 @@
 #include "RedirectionConstants.h"
 #include <stdint.h>
+#include <stdbool.h>
 
 enum redir_state {
     REDIR_NONE      =  0,
@@ -33,6 +34,7 @@ struct redir {
 
     /* ide-redirection */
     unsigned char     filename[256];
+    unsigned int      lba_size;
     void              *mmap_buf;
     ssize_t           mmap_size;
     unsigned int      tx_bufsize;
@@ -140,4 +142,5 @@ int redir_data(struct redir *r);
 ssize_t redir_write(struct redir *r, const char *buf, size_t count);
 
 int ider_handle_command(struct redir *r, unsigned int seqno,
-			unsigned char device, unsigned char *cdb);
+			unsigned char device, bool use_dma,
+			unsigned char *cdb);

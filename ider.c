@@ -28,29 +28,34 @@
 
 static int ider_data_to_host(struct redir *r, unsigned int seqno,
 			     unsigned char device,  unsigned char *data,
-			     unsigned int data_len, bool completed)
+			     unsigned int data_len, bool completed, bool dma)
 {
     unsigned char *request;
     int ret;
-    unsigned char mask = IDER_STATUS_MASK | IDER_SECTOR_COUNT_MASK |
-	IDER_INTERRUPT_MASK;
+    unsigned char mask = IDER_STATUS_MASK | IDER_SECTOR_COUNT_MASK;
     struct ider_data_to_host_message msg = {
 	.type = IDER_DATA_TO_HOST,
 	.attributes = completed ? 2 : 0,
 	.input.mask = mask | IDER_BYTE_CNT_LSB_MASK | IDER_BYTE_CNT_MSB_MASK,
 	.input.sector_count = IDER_INTERRUPT_IO,
-	.input.byte_count_lsb = (data_len & 0xff),
-	.input.byte_count_msb = (data_len >> 8) & 0xff,
 	.input.drive_select = device,
 	.input.status = IDER_STATUS_DRDY | IDER_STATUS_DSC | IDER_STATUS_DRQ,
-	.output.mask = mask,
-	.output.sector_count = IDER_INTERRUPT_CD | IDER_INTERRUPT_CD,
-	.output.drive_select = device,
-	.output.status = IDER_STATUS_DRDY | IDER_STATUS_DSC,
     };
 
     memcpy(&msg.transfer_bytes, &data_len, 2);
     memcpy(&msg.sequence_number, &seqno, 4);
+    if (!dma) {
+	msg.input.mask |= IDER_INTERRUPT_MASK;
+    } else {
+	msg.input.byte_count_lsb = (data_len & 0xff);
+	msg.input.byte_count_msb = (data_len >> 8) & 0xff;
+    }
+    if (completed) {
+	msg.output.mask = mask | IDER_INTERRUPT_MASK;
+	msg.output.sector_count = IDER_INTERRUPT_CD | IDER_INTERRUPT_CD;
+	msg.output.drive_select = device;
+	msg.output.status = IDER_STATUS_DRDY | IDER_STATUS_DSC;
+    }
     request = malloc(sizeof(msg) + data_len);
     memcpy(request, &msg, sizeof(msg));
     memcpy(request + sizeof(msg), data, data_len);
@@ -85,6 +90,36 @@ static int ider_packet_sense(struct redir *r, unsigned int seqno,
     }
     return redir_write(r, (const char *)&msg, sizeof(msg));
 }    
+
+static int ider_read_data(struct redir *r, unsigned int seqno,
+			  unsigned char device, bool use_dma,
+			  unsigned long lba, unsigned int count)
+{
+    unsigned int offset = 0, lba_size = r->lba_size;
+    off_t mmap_offset = lba * lba_size;
+    bool last_lba = false;
+    int ret = 0;
+
+    if (!count)
+	return ider_packet_sense(r, seqno, device, 0x00, 0x00, 0x00);
+    if (mmap_offset >= r->mmap_size)
+	return ider_packet_sense(r, seqno, device, 0x05, 0x21, 0x00);
+    while (offset < count) {
+	off_t lba_offset = offset * lba_size;
+	unsigned char *lba_ptr =
+		(unsigned char *)r->mmap_buf + mmap_offset + lba_offset;
+	if (mmap_offset + lba_offset + lba_size > r->mmap_size) {
+	    lba_size = r->mmap_size - mmap_offset - lba_offset;
+	    last_lba = true;
+	}
+	ret = ider_data_to_host(r, seqno, device, lba_ptr,
+				lba_size, last_lba, use_dma);
+	if (ret < 0)
+	    break;
+	offset++;
+    }
+    return ret;
+}
 
 unsigned char ider_mode_page_01_floppy[] = {
     0x00, 0x12, 0x24, 0x80, 0x00, 0x00, 0x00, 0x00,
@@ -169,14 +204,13 @@ unsigned char ider_mode_page_2a_cdrom[] = {
 };
 
 int ider_handle_command(struct redir *r, unsigned int seqno,
-			unsigned char device, unsigned char *cdb)
+			unsigned char device, bool use_dma,
+			unsigned char *cdb)
 {
     unsigned char resp[512];
     unsigned char *mode_sense = NULL;
-    uint32_t lba, sector_size, mode_len, resp_len;
-    unsigned int lba_size, offset;
-    bool last_lba = false;
-    int ret = 0;
+    uint32_t lba, mode_len;
+    unsigned int count;
 
     if (!r->mmap_size)
 	/* NOT READY, MEDIUM NOT PRESENT */
@@ -192,7 +226,7 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	resp[1] = 0x05; /* Medium type: CD-ROM data only */
 	resp[2] = 0x80; /* device-specific parameters: Write Protect */
 	resp[3] = 0;    /* Block-descriptor length */
-	return ider_data_to_host(r, seqno, device, resp, 4, true);
+	return ider_data_to_host(r, seqno, device, resp, 4, true, use_dma);
     case MODE_SENSE_10:
 	mode_len = ((unsigned int)cdb[7] << 8) | (unsigned int)(cdb[8]);
 	if (device == 0xa0) {
@@ -245,23 +279,22 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	if (mode_len > sizeof(mode_sense))
 	    mode_len = sizeof(mode_sense);
 	return ider_data_to_host(r, seqno, device,
-				 mode_sense, mode_len, true);
+				 mode_sense, mode_len, true, use_dma);
     case READ_CAPACITY:
 	if (device == 0xa0) {
 	    /* NOT READY, MEDIUM NOT PRESENT */
 	    return ider_packet_sense(r, seqno, device, 0x02, 0x3a, 0x0);
 	}
 	lba = (r->mmap_size >> 11) - 1;
-	sector_size = (unsigned int)1 << 11;
 	resp[0] = (lba >> 24) & 0xff;
 	resp[1] = (lba >> 16) & 0xff;
 	resp[2] = (lba >>  8) & 0xff;
 	resp[3] = lba & 0xff;
-	resp[4] = (sector_size >> 24) & 0xff;
-	resp[5] = (sector_size >> 16) & 0xff;
-	resp[6] = (sector_size >>  8) & 0xff;
-	resp[7] = sector_size & 0xff;
-	return ider_data_to_host(r, seqno, device, resp, 8, true);
+	resp[4] = (r->lba_size >> 24) & 0xff;
+	resp[5] = (r->lba_size >> 16) & 0xff;
+	resp[6] = (r->lba_size >>  8) & 0xff;
+	resp[7] = r->lba_size & 0xff;
+	return ider_data_to_host(r, seqno, device, resp, 8, true, use_dma);
     case READ_10:
 	if (device == 0xa0) {
 	    /* NOT READY, MEDIUM NOT PRESENT */
@@ -271,22 +304,9 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	    (unsigned int)cdb[3] << 16 |
 	    (unsigned int)cdb[4] << 8 |
 	    (unsigned int)cdb[5];
-	resp_len = (unsigned int)cdb[7] << 8 | (unsigned int)cdb[8];
-	lba_size = 1 << 11;
-	last_lba = false;
-	for (offset = 0; offset < resp_len; offset += lba_size) {
-	    unsigned char *lba_ptr =
-		(unsigned char *)r->mmap_buf + lba + offset;
-	    if (lba_size >= (resp_len - offset)) {
-		lba_size = (resp_len - offset);
-		last_lba = true;
-	    }
-	    ret = ider_data_to_host(r, seqno, device, lba_ptr,
-				    lba_size, last_lba);
-	    if (ret < 0)
-		return ret;
-	}
-	return ret;
+	count = (unsigned int)cdb[7] << 8 | (unsigned int)cdb[8];
+	fprintf(stderr, "seqno %u: read lba %u count %u\n", seqno, lba, count);
+	return ider_read_data(r, seqno, device, lba, count, use_dma);
     default:
 	break;
     }
