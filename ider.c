@@ -211,9 +211,9 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 			unsigned char *cdb)
 {
     unsigned char resp[512];
-    unsigned char *mode_sense = NULL;
+    unsigned char *mode_sense = NULL, format;
     uint32_t lba, mode_len;
-    unsigned int count;
+    unsigned int count, resp_len = 0;
 
     if (!r->mmap_size || device != r->device)
 	/* NOT READY, MEDIUM NOT PRESENT */
@@ -306,8 +306,6 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	    /* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
 	    return ider_packet_sense(r, device, 0x05, 0x20, 0x00);
 	} else {
-	    unsigned int resp_len;
-	    unsigned char format;
 	    bool msf;
 
 	    resp_len = (unsigned int)cdb[7] << 8 | cdb[8];
@@ -364,11 +362,40 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	/* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
 	return ider_packet_sense(r, device, 0x05, 0x20, 0x00);
     case 0x51: /* READ DISC INFORMATION, missing from scsi.h */
-	/* Not supported */
-	fprintf(stderr, "seqno %u: read disc information (not implemented)\n",
-		seqno);
-	/* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
-	return ider_packet_sense(r, device, 0x05, 0x20, 0x00);
+	format = cdb[1] & 0x7;
+	resp_len = (unsigned int)cdb[7] << 8 | cdb[8];
+	fprintf(stderr, "seqno %u: read disc information format %u len %u\n",
+		seqno, format, resp_len);
+	if (format != 0) {
+		/* CHECK CONDITION, INVALID FIELD IN CDB */
+		return ider_packet_sense(r, device, 0x05, 0x24, 0x00);
+	}
+	if (resp_len > sizeof(resp))
+	    resp_len = sizeof(resp);
+	if (resp_len < 34)
+	    resp_len = 34;
+	memset(resp, 0x0, resp_len);
+	resp[0] = (resp_len >> 8) & 0xff;
+	resp[1] = (resp_len & 0xff);
+	resp[2] = 0x0e;
+	return ider_data_to_host(r, device, resp, resp_len, true, use_dma);
+    case 0x52: /* READ TRACK INFORMATION */
+	format = cdb[1] & 0x3;
+	lba = (unsigned int)cdb[2] << 24 |
+	    (unsigned int)cdb[3] << 16 |
+	    (unsigned int)cdb[4] << 8 |
+	    (unsigned int)cdb[5];
+	resp_len = (unsigned int)cdb[7] << 8 | (unsigned int)cdb[8];
+	fprintf(stderr, "seqno %u: read track information type %u lba %u\n",
+		seqno, format, lba);
+	if (resp_len < 48)
+	    resp_len = 48;
+	if (resp_len > sizeof(resp))
+	    resp_len = sizeof(resp);
+	memset(resp, 0x0, resp_len);
+	resp[0] = (resp_len >> 8) & 0xff;
+	resp[1] = (resp_len & 0xff);
+	return ider_data_to_host(r, device, resp, resp_len, true, use_dma);
     case READ_10:
 	lba = (unsigned int)cdb[2] << 24 |
 	    (unsigned int)cdb[3] << 16 |
