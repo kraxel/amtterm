@@ -305,15 +305,16 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	if (device == 0xa0) {
 	    /* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
 	    return ider_packet_sense(r, device, 0x05, 0x20, 0x00);
-#if 0
 	} else {
 	    unsigned int resp_len;
 	    unsigned char format;
 	    bool msf;
 
-	    resp_len = cdb[7];
+	    resp_len = (unsigned int)cdb[7] << 8 | cdb[8];
 	    format = cdb[2] & 0x0f;
 	    msf = cdb[1] & 0x02;
+	    fprintf(stderr, "seqno %u: read toc format %u msf %u len %u\n",
+		    seqno, format, msf, resp_len);
 	    if (format != 0 && format != 1) {
 		/* CHECK CONDITION, INVALID FIELD IN CDB */
 		return ider_packet_sense(r, device, 0x05, 0x24, 0x00);
@@ -355,13 +356,6 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 		resp[6] = 0x01; /* First track in last complete session */
 	    }
 	    return ider_data_to_host(r, device, resp, resp_len, true, use_dma);
-#else
-	    /* Not supported */
-	    fprintf(stderr, "seqno %u: read toc (not implemented)\n",
-		    seqno);
-	    /* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
-	    return ider_packet_sense(r, device, 0x05, 0x20, 0x00);
-#endif
 	}
 	break;
     case 0x46: /* GET CONFIGURATION, missing from scsi.h */

@@ -212,7 +212,7 @@ int main(int argc, char *argv[])
 	snprintf(r.pass, sizeof(r.pass), "%s", h);
 
     for (;;) {
-	if (-1 == (c = getopt(argc, argv, "df:ghvqu:p:LC:")))
+	if (-1 == (c = getopt(argc, argv, "cdf:ghvqu:p:LC:")))
 	    break;
 	switch (c) {
 	case 'v':
