@@ -136,7 +136,7 @@ int redir_sol_send(struct redir *r, unsigned char *buf, int blen);
 int redir_sol_recv(struct redir *r);
 int redir_ider_start(struct redir *r);
 int redir_ider_config(struct redir *r);
-int redir_ider_reset(struct redir *r, unsigned int seqno);
+int redir_ider_reset(struct redir *r);
 int redir_ider_stop(struct redir *r);
 int redir_ider_send(struct redir *r, unsigned char *buf, int blen);
 int redir_ider_recv(struct redir *r);

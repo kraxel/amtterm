@@ -108,6 +108,7 @@ ssize_t redir_write(struct redir *r, const char *buf, size_t count)
     rc = sslwrite(r->ctx, buf, count);
     if (-1 == rc)
 	snprintf(r->err, sizeof(r->err), "write(socket): %s", strerror(errno));
+    r->seqno++;
     return rc;
 }
 
@@ -417,16 +418,15 @@ int redir_ider_config(struct redir *r)
 	IDER_FEATURE_ENABLE | r->enable_options, 0, 0, 0
     };
     redir_state(r, REDIR_CFG_IDER);
-    r->seqno++;
     return redir_write(r, request, sizeof(request));
 }
 
-int redir_ider_reset(struct redir *r, unsigned int seqno)
+int redir_ider_reset(struct redir *r)
 {
     unsigned char request[IDER_RESET_OCCURED_RESPONSE_LENGTH] = {
 	IDER_RESET_OCCURED_RESPONSE, 0, 0, 0,
-	seqno & 0xff, (seqno >> 8) & 0xff,
-	(seqno >> 16) & 0xff, (seqno >> 24) & 0xff,
+	r->seqno & 0xff, (r->seqno >> 8) & 0xff,
+	(r->seqno >> 16) & 0xff, (r->seqno >> 24) & 0xff,
     };
 
     return redir_write(r, request, sizeof(request));
@@ -686,17 +686,20 @@ repeat:
 	    bshift = r->blen;
 	    if (r->blen < IDER_DISABLE_ENABLE_FEATURES_REPLY_LENGTH)
 		goto again;
-	    if (r->seqno != redir_hdr_seqno(r))
-		goto err;
 	    redir_state(r, REDIR_RUN_IDER);
 	    break;
 	case IDER_RESET_OCCURED:
 	    bshift = r->blen;
 	    seqno = redir_hdr_seqno(r);
 	    fprintf(stderr, "seqno %u: reset, mask %u\n", seqno, r->buf[8]);
-	    if (-1 == redir_ider_reset(r, seqno))
+	    if (-1 == redir_ider_reset(r))
 		goto err;
 	    break;
+	case IDER_ERROR_OCCURED:
+	    bshift = r->blen;
+	    seqno = redir_hdr_seqno(r);
+	    fprintf(stderr, "seqno %u: error, mask %u\n", seqno, r->buf[8]);
+	    goto err;
 	case IDER_COMMAND_WRITTEN:
 	    bshift = r->blen;
 	    if (r->blen < sizeof(struct ider_command_written_message))

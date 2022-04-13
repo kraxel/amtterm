@@ -26,9 +26,9 @@
 #include <scsi/scsi.h>
 #include "redir.h"
 
-static int ider_data_to_host(struct redir *r, unsigned int seqno,
-			     unsigned char device,  unsigned char *data,
-			     unsigned int data_len, bool completed, bool dma)
+static int ider_data_to_host(struct redir *r, unsigned char device,
+			     unsigned char *data, unsigned int data_len,
+			     bool completed, bool dma)
 {
     unsigned char *request;
     int ret;
@@ -43,7 +43,7 @@ static int ider_data_to_host(struct redir *r, unsigned int seqno,
     };
 
     memcpy(&msg.transfer_bytes, &data_len, 2);
-    memcpy(&msg.sequence_number, &seqno, 4);
+    memcpy(&msg.sequence_number, &r->seqno, 4);
     if (!dma) {
 	msg.input.mask |= IDER_INTERRUPT_MASK;
     } else {
@@ -65,7 +65,7 @@ static int ider_data_to_host(struct redir *r, unsigned int seqno,
     return ret;
 }
 
-static int ider_packet_sense(struct redir *r, unsigned int seqno,
+static int ider_packet_sense(struct redir *r,
 			     unsigned char device, unsigned char sense,
 			     unsigned char asc, unsigned char asq)
 {
@@ -79,7 +79,7 @@ static int ider_packet_sense(struct redir *r, unsigned int seqno,
 	.output.drive_select = device,
 	.output.status = IDER_STATUS_DRDY | IDER_STATUS_DSC,
     };
-    memcpy(&msg.sequence_number, &seqno, 4);
+    memcpy(&msg.sequence_number, &r->seqno, 4);
     if (sense) {
 	msg.output.error = (sense << 4);
 	msg.output.mask |= IDER_ERROR_MASK;
@@ -91,8 +91,7 @@ static int ider_packet_sense(struct redir *r, unsigned int seqno,
     return redir_write(r, (const char *)&msg, sizeof(msg));
 }    
 
-static int ider_read_data(struct redir *r, unsigned int seqno,
-			  unsigned char device, bool use_dma,
+static int ider_read_data(struct redir *r, unsigned char device, bool use_dma,
 			  unsigned long lba, unsigned int count)
 {
     off_t mmap_offset = lba << r->lba_shift;
@@ -101,12 +100,11 @@ static int ider_read_data(struct redir *r, unsigned int seqno,
 	(unsigned char *)r->mmap_buf + mmap_offset;
 
     if (!count)
-	return ider_packet_sense(r, seqno, device, 0x00, 0x00, 0x00);
+	return ider_packet_sense(r, device, 0x00, 0x00, 0x00);
     if (mmap_offset >= r->mmap_size)
-	return ider_packet_sense(r, seqno, device, 0x05, 0x21, 0x00);
+	return ider_packet_sense(r, device, 0x05, 0x21, 0x00);
 
-    return ider_data_to_host(r, seqno, device, lba_ptr,
-			     mmap_len, true, use_dma);
+    return ider_data_to_host(r, device, lba_ptr, mmap_len, true, use_dma);
 }
 
 unsigned char ider_mode_page_01_floppy[] = {
@@ -202,27 +200,27 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 
     if (!r->mmap_size || device != r->device)
 	/* NOT READY, MEDIUM NOT PRESENT */
-	return ider_packet_sense(r, seqno, device, 0x02, 0x3a, 0x0);
+	return ider_packet_sense(r, device, 0x02, 0x3a, 0x0);
 
     switch (cdb[0]) {
     case TEST_UNIT_READY:
 	fprintf(stderr, "seqno %u: dev %02x test unit ready\n",
 		seqno, device);
-	return ider_packet_sense(r, seqno, device, 0, 0, 0);
+	return ider_packet_sense(r, device, 0, 0, 0);
     case ALLOW_MEDIUM_REMOVAL:
 	fprintf(stderr, "seqno %u: dev %02x %s medium removal\n",
 		seqno, device, cdb[4] & 1 ? "prevent" : "allow");
-	return ider_packet_sense(r, seqno, device, 0, 0, 0);
+	return ider_packet_sense(r, device, 0, 0, 0);
     case MODE_SENSE:
 	fprintf(stderr, "seqno %u: dev %02x mode sense pg %02x\n",
 		seqno, device, cdb[2]);
 	if (cdb[2] != 0x3f || cdb[3] != 0x00)
-	    return ider_packet_sense(r, seqno, device, 0x05, 0x24, 0x00);
+	    return ider_packet_sense(r, device, 0x05, 0x24, 0x00);
 	resp[0] = 0;    /* Mode data length */
 	resp[1] = 0x05; /* Medium type: CD-ROM data only */
 	resp[2] = 0x80; /* device-specific parameters: Write Protect */
 	resp[3] = 0;    /* Block-descriptor length */
-	return ider_data_to_host(r, seqno, device, resp, 4, true, use_dma);
+	return ider_data_to_host(r, device, resp, 4, true, use_dma);
     case MODE_SENSE_10:
 	mode_len = ((unsigned int)cdb[7] << 8) | (unsigned int)(cdb[8]);
 	lba = (r->mmap_size >> r->lba_shift);
@@ -269,11 +267,10 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	    break;
 	}
 	if (!mode_sense)
-	    return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
+	    return ider_packet_sense(r, device, 0x05, 0x20, 0x00);
 	if (mode_len > sizeof(mode_sense))
 	    mode_len = sizeof(mode_sense);
-	return ider_data_to_host(r, seqno, device,
-				 mode_sense, mode_len, true, use_dma);
+	return ider_data_to_host(r, device, mode_sense, mode_len, true, use_dma);
     case READ_CAPACITY:
 	lba = (r->mmap_size >> r->lba_shift) - 1;
 	resp[0] = (lba >> 24) & 0xff;
@@ -286,11 +283,11 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	resp[7] = r->lba_size & 0xff;
 	fprintf(stderr, "seqno %u: read capacity size %u block size %u\n",
 		seqno, lba, r->lba_size);
-	return ider_data_to_host(r, seqno, device, resp, 8, true, use_dma);
+	return ider_data_to_host(r, device, resp, 8, true, use_dma);
     case READ_TOC:
 	if (device == 0xa0) {
 	    /* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
-	    return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
+	    return ider_packet_sense(r, device, 0x05, 0x20, 0x00);
 #if 0
 	} else {
 	    unsigned int resp_len;
@@ -302,7 +299,7 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	    msf = cdb[1] & 0x02;
 	    if (format != 0 && format != 1) {
 		/* CHECK CONDITION, INVALID FIELD IN CDB */
-		return ider_packet_sense(r, seqno, device, 0x05, 0x24, 0x00);
+		return ider_packet_sense(r, device, 0x05, 0x24, 0x00);
 	    }
 	    if (format == 0) {
 		memset(resp, 0x0, 0x14);
@@ -340,14 +337,13 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 		resp[5] = 0x14; /* ADR: 0x01, CONTROL: 0x04 */
 		resp[6] = 0x01; /* First track in last complete session */
 	    }
-	    return ider_data_to_host(r, seqno, device,
-				     resp, resp_len, true, use_dma);
+	    return ider_data_to_host(r, device, resp, resp_len, true, use_dma);
 #else
 	    /* Not supported */
 	    fprintf(stderr, "seqno %u: read toc (not implemented)\n",
 		    seqno);
 	    /* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
-	    return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
+	    return ider_packet_sense(r, device, 0x05, 0x20, 0x00);
 #endif
 	}
 	break;
@@ -355,13 +351,13 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	fprintf(stderr, "seqno %u: device %02x get configuration (n/i)\n",
 		seqno, device);
 	/* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
-	return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
+	return ider_packet_sense(r, device, 0x05, 0x20, 0x00);
     case 0x51: /* READ DISC INFORMATION, missing from scsi.h */
 	/* Not supported */
 	fprintf(stderr, "seqno %u: read disc information (not implemented)\n",
 		seqno);
 	/* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
-	return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
+	return ider_packet_sense(r, device, 0x05, 0x20, 0x00);
     case READ_10:
 	lba = (unsigned int)cdb[2] << 24 |
 	    (unsigned int)cdb[3] << 16 |
@@ -369,11 +365,11 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	    (unsigned int)cdb[5];
 	count = (unsigned int)cdb[7] << 8 | (unsigned int)cdb[8];
 	fprintf(stderr, "seqno %u: read lba %u count %u\n", seqno, lba, count);
-	return ider_read_data(r, seqno, device, use_dma, lba, count);
+	return ider_read_data(r, device, use_dma, lba, count);
     default:
 	break;
     }
     fprintf(stderr, "seqno %u: unhandled command %02x\n", seqno, cdb[0]);
     /* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
-    return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
+    return ider_packet_sense(r, device, 0x05, 0x20, 0x00);
 }
