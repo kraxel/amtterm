@@ -171,6 +171,7 @@ static void usage(FILE *fp)
 	    "   -h            print this text\n"
 	    "   -v            verbose (default)\n"
 	    "   -q            quiet\n"
+	    "   -c            use CD-ROM emulation\n"
 	    "   -g            start redirection gracefully\n"
 	    "   -r            start redirection on reboot\n"
 	    "   -f file       file to use as device data\n"
@@ -204,14 +205,14 @@ int main(int argc, char *argv[])
     r.cb_data  = &r;
     r.cb_recv  = recv_ider;
     r.cb_state = state_ider;
+    r.device = 0xa0;
     r.enable_options = IDER_START_NOW;
-    r.lba_size = (unsigned int)1 << 11;
 
     if (NULL != (h = getenv("AMT_PASSWORD")))
 	snprintf(r.pass, sizeof(r.pass), "%s", h);
 
     for (;;) {
-	if (-1 == (c = getopt(argc, argv, "f:ghvqu:p:LC:")))
+	if (-1 == (c = getopt(argc, argv, "df:ghvqu:p:LC:")))
 	    break;
 	switch (c) {
 	case 'v':
@@ -225,6 +226,9 @@ int main(int argc, char *argv[])
 	    break;
 	case 'u':
 	    snprintf(r.user, sizeof(r.user), "%s", optarg);
+	    break;
+	case 'c':
+	    r.device = 0xb0;
 	    break;
 	case 'g':
 	    r.enable_options = IDER_START_GRACEFUL;
@@ -289,7 +293,13 @@ int main(int argc, char *argv[])
 	perror("mmap");
 	exit(1);
     }
-
+    if (r.device == 0xa0) {
+	r.lba_size = 512;
+	r.lba_shift = 9;
+    } else {
+	r.lba_size = 2048;
+	r.lba_shift = 11;
+    }
     if (0 == strlen(r.pass)) {
 	tty_save();
 	tty_noecho();

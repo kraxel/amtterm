@@ -35,8 +35,10 @@ struct redir {
     /* ide-redirection */
     unsigned char     filename[256];
     unsigned int      lba_size;
+    unsigned int      lba_shift;
     void              *mmap_buf;
     ssize_t           mmap_size;
+    unsigned char     device;
     unsigned int      tx_bufsize;
     unsigned int      rx_bufsize;
     unsigned int      enable_options;

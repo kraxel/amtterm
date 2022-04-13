@@ -95,30 +95,18 @@ static int ider_read_data(struct redir *r, unsigned int seqno,
 			  unsigned char device, bool use_dma,
 			  unsigned long lba, unsigned int count)
 {
-    unsigned int offset = 0, lba_size = r->lba_size;
-    off_t mmap_offset = lba * lba_size;
-    bool last_lba = false;
-    int ret = 0;
+    off_t mmap_offset = lba << r->lba_shift;
+    size_t mmap_len = count << r->lba_shift;
+    unsigned char *lba_ptr =
+	(unsigned char *)r->mmap_buf + mmap_offset;
 
     if (!count)
 	return ider_packet_sense(r, seqno, device, 0x00, 0x00, 0x00);
     if (mmap_offset >= r->mmap_size)
 	return ider_packet_sense(r, seqno, device, 0x05, 0x21, 0x00);
-    while (offset < count) {
-	off_t lba_offset = offset * lba_size;
-	unsigned char *lba_ptr =
-		(unsigned char *)r->mmap_buf + mmap_offset + lba_offset;
-	if (mmap_offset + lba_offset + lba_size >= r->mmap_size) {
-	    lba_size = r->mmap_size - mmap_offset - lba_offset;
-	    last_lba = true;
-	}
-	ret = ider_data_to_host(r, seqno, device, lba_ptr,
-				lba_size, last_lba, use_dma);
-	if (ret < 0)
-	    break;
-	offset++;
-    }
-    return ret;
+
+    return ider_data_to_host(r, seqno, device, lba_ptr,
+			     mmap_len, true, use_dma);
 }
 
 unsigned char ider_mode_page_01_floppy[] = {
@@ -212,7 +200,7 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
     uint32_t lba, mode_len;
     unsigned int count;
 
-    if (!r->mmap_size)
+    if (!r->mmap_size || device != r->device)
 	/* NOT READY, MEDIUM NOT PRESENT */
 	return ider_packet_sense(r, seqno, device, 0x02, 0x3a, 0x0);
 
@@ -237,11 +225,7 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	return ider_data_to_host(r, seqno, device, resp, 4, true, use_dma);
     case MODE_SENSE_10:
 	mode_len = ((unsigned int)cdb[7] << 8) | (unsigned int)(cdb[8]);
-	if (device == 0xa0) {
-	    lba = 0;
-	} else {
-	    lba = (r->mmap_size >> 11);
-	}
+	lba = (r->mmap_size >> r->lba_shift);
 	fprintf(stderr, "seqno %u: mode sense pg %02x len %u\n",
 		seqno, cdb[2], mode_len);
 	switch (cdb[2] & 0x3f) {
@@ -291,11 +275,7 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	return ider_data_to_host(r, seqno, device,
 				 mode_sense, mode_len, true, use_dma);
     case READ_CAPACITY:
-	if (device == 0xa0) {
-	    /* NOT READY, MEDIUM NOT PRESENT */
-	    return ider_packet_sense(r, seqno, device, 0x02, 0x3a, 0x0);
-	}
-	lba = (r->mmap_size >> 11) - 1;
+	lba = (r->mmap_size >> r->lba_shift) - 1;
 	resp[0] = (lba >> 24) & 0xff;
 	resp[1] = (lba >> 16) & 0xff;
 	resp[2] = (lba >>  8) & 0xff;
@@ -308,16 +288,15 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 		seqno, lba, r->lba_size);
 	return ider_data_to_host(r, seqno, device, resp, 8, true, use_dma);
     case READ_TOC:
+	if (device == 0xa0) {
+	    /* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
+	    return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
 #if 0
-	{
+	} else {
 	    unsigned int resp_len;
 	    unsigned char format;
 	    bool msf;
 
-	    if (device == 0xa0) {
-		/* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
-		return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
-	    }
 	    resp_len = cdb[7];
 	    format = cdb[2] & 0x0f;
 	    msf = cdb[1] & 0x02;
@@ -363,15 +342,15 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	    }
 	    return ider_data_to_host(r, seqno, device,
 				     resp, resp_len, true, use_dma);
+#else
+	    /* Not supported */
+	    fprintf(stderr, "seqno %u: read toc (not implemented)\n",
+		    seqno);
+	    /* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
+	    return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
+#endif
 	}
 	break;
-#else
-	/* Not supported */
-	fprintf(stderr, "seqno %u: read toc (not implemented)\n",
-		seqno);
-	/* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
-	return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
-#endif
     case 0x46: /* GET CONFIGURATION, missing from scsi.h */
 	fprintf(stderr, "seqno %u: device %02x get configuration (n/i)\n",
 		seqno, device);
@@ -384,10 +363,6 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	/* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
 	return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
     case READ_10:
-	if (device == 0xa0) {
-	    /* NOT READY, MEDIUM NOT PRESENT */
-	    return ider_packet_sense(r, seqno, device, 0x02, 0x3a, 0x0);
-	}
 	lba = (unsigned int)cdb[2] << 24 |
 	    (unsigned int)cdb[3] << 16 |
 	    (unsigned int)cdb[4] << 8 |
