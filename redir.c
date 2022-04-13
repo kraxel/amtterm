@@ -456,8 +456,8 @@ static int redir_ider_command(struct redir *r, unsigned int seqno)
 		 msg->command);
 	return -1;
     }
-    fprintf(stderr, "command %02x (%sdma): ", msg->command,
-	    use_dma ? "" : "non-");
+    fprintf(stderr, "seqno %u: dev %02x command %02x (%sdma): ",
+	    seqno, device, msg->command, use_dma ? "" : "non-");
     for (i = 0; i < sizeof(msg->packet_data); i++)
 	fprintf(stderr, "%02x ", msg->packet_data[i]);
     fprintf(stderr, "\n");

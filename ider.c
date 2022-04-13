@@ -70,7 +70,7 @@ static int ider_packet_sense(struct redir *r, unsigned int seqno,
 			     unsigned char asc, unsigned char asq)
 {
     unsigned char mask = IDER_INTERRUPT_MASK | IDER_SECTOR_COUNT_MASK |
-	IDER_DRIVE_SELECT_MASK | IDER_STATUS_MASK;
+	IDER_STATUS_MASK; /* | IDER_DRIVE_SELECT_MASK */
     struct ider_command_response_message msg = {
 	.type = IDER_COMMAND_END_RESPONSE,
 	.attributes = 2,
@@ -108,7 +108,7 @@ static int ider_read_data(struct redir *r, unsigned int seqno,
 	off_t lba_offset = offset * lba_size;
 	unsigned char *lba_ptr =
 		(unsigned char *)r->mmap_buf + mmap_offset + lba_offset;
-	if (mmap_offset + lba_offset + lba_size > r->mmap_size) {
+	if (mmap_offset + lba_offset + lba_size >= r->mmap_size) {
 	    lba_size = r->mmap_size - mmap_offset - lba_offset;
 	    last_lba = true;
 	}
@@ -218,8 +218,16 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 
     switch (cdb[0]) {
     case TEST_UNIT_READY:
+	fprintf(stderr, "seqno %u: dev %02x test unit ready\n",
+		seqno, device);
+	return ider_packet_sense(r, seqno, device, 0, 0, 0);
+    case ALLOW_MEDIUM_REMOVAL:
+	fprintf(stderr, "seqno %u: dev %02x %s medium removal\n",
+		seqno, device, cdb[4] & 1 ? "prevent" : "allow");
 	return ider_packet_sense(r, seqno, device, 0, 0, 0);
     case MODE_SENSE:
+	fprintf(stderr, "seqno %u: dev %02x mode sense pg %02x\n",
+		seqno, device, cdb[2]);
 	if (cdb[2] != 0x3f || cdb[3] != 0x00)
 	    return ider_packet_sense(r, seqno, device, 0x05, 0x24, 0x00);
 	resp[0] = 0;    /* Mode data length */
@@ -234,6 +242,8 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	} else {
 	    lba = (r->mmap_size >> 11);
 	}
+	fprintf(stderr, "seqno %u: mode sense pg %02x len %u\n",
+		seqno, cdb[2], mode_len);
 	switch (cdb[2] & 0x3f) {
 	case 0x01:
 	    if (device == 0xa0) {
@@ -294,7 +304,85 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	resp[5] = (r->lba_size >> 16) & 0xff;
 	resp[6] = (r->lba_size >>  8) & 0xff;
 	resp[7] = r->lba_size & 0xff;
+	fprintf(stderr, "seqno %u: read capacity size %u block size %u\n",
+		seqno, lba, r->lba_size);
 	return ider_data_to_host(r, seqno, device, resp, 8, true, use_dma);
+    case READ_TOC:
+#if 0
+	{
+	    unsigned int resp_len;
+	    unsigned char format;
+	    bool msf;
+
+	    if (device == 0xa0) {
+		/* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
+		return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
+	    }
+	    resp_len = cdb[7];
+	    format = cdb[2] & 0x0f;
+	    msf = cdb[1] & 0x02;
+	    if (format != 0 && format != 1) {
+		/* CHECK CONDITION, INVALID FIELD IN CDB */
+		return ider_packet_sense(r, seqno, device, 0x05, 0x24, 0x00);
+	    }
+	    if (format == 0) {
+		memset(resp, 0x0, 0x14);
+		if (resp_len > 0x14)
+		    resp_len = 0x14;
+		resp[0] = 0x00; /* Data length: MSB */
+		resp[1] = 0x12; /* Data length: LSB */
+		resp[2] = 0x01; /* First track number */
+		resp[3] = 0x01; /* Last track number */
+		resp[5] = 0x14; /* ADR: 0x01, CONTROL: 0x04 */
+		resp[6] = 0x01; /* Track Number: 1 */
+		/* Track 1 start address */
+		resp[13] = 0x14; /* ADR: 0x01, CONTROL: 0x04 */
+		resp[14] = 0xaa; /* Track Number: Start of lead-out */
+		/* Track 2 start address */
+		if (msf) {
+		    resp[8] = 0x00; /* Track start address */
+		    resp[9] = 0x00;
+		    resp[10] = 0x02;
+		    resp[11] = 0x00;
+		    resp[16] = 0x00; /* Track start address */
+		    resp[17] = 0x00;
+		    resp[18] = 0x34;
+		    resp[19] = 0x13;
+		}
+		/* All zero track addresses for non-MSF */
+	    } else {
+		if (resp_len > 0x0c)
+		    resp_len = 0x0c;
+		resp[0] = 0x00; /* Data length: MSB */
+		resp[1] = 0x0a; /* Data length: LSB */
+		resp[2] = 0x01; /* First complete session */
+		resp[3] = 0x01; /* Last complete session */
+		resp[4] = 0x00; /* Reserved */
+		resp[5] = 0x14; /* ADR: 0x01, CONTROL: 0x04 */
+		resp[6] = 0x01; /* First track in last complete session */
+	    }
+	    return ider_data_to_host(r, seqno, device,
+				     resp, resp_len, true, use_dma);
+	}
+	break;
+#else
+	/* Not supported */
+	fprintf(stderr, "seqno %u: read toc (not implemented)\n",
+		seqno);
+	/* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
+	return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
+#endif
+    case 0x46: /* GET CONFIGURATION, missing from scsi.h */
+	fprintf(stderr, "seqno %u: device %02x get configuration (n/i)\n",
+		seqno, device);
+	/* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
+	return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
+    case 0x51: /* READ DISC INFORMATION, missing from scsi.h */
+	/* Not supported */
+	fprintf(stderr, "seqno %u: read disc information (not implemented)\n",
+		seqno);
+	/* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
+	return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
     case READ_10:
 	if (device == 0xa0) {
 	    /* NOT READY, MEDIUM NOT PRESENT */
@@ -306,11 +394,11 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	    (unsigned int)cdb[5];
 	count = (unsigned int)cdb[7] << 8 | (unsigned int)cdb[8];
 	fprintf(stderr, "seqno %u: read lba %u count %u\n", seqno, lba, count);
-	return ider_read_data(r, seqno, device, lba, count, use_dma);
+	return ider_read_data(r, seqno, device, use_dma, lba, count);
     default:
 	break;
     }
     fprintf(stderr, "seqno %u: unhandled command %02x\n", seqno, cdb[0]);
-    /* ILLEGAL REQUEST, CDB NOT SUPPORTED */
+    /* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
     return ider_packet_sense(r, seqno, device, 0x05, 0x20, 0x00);
 }
