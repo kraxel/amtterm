@@ -206,6 +206,46 @@ unsigned char ider_mode_page_2a_cdrom[] = {
     0x00, 0x00
 };
 
+unsigned char ider_config_feature_0000[] = {
+    0x00, 0x00, /* Feature Code 0000: profile list */
+    0x03, 0x04, /* Ver=0, Persist=1, Current = 1 Adittional Len = 4 */
+    0x00, 0x08, 0x01, 0x00, /* Current profile: 0008 - CD-ROM */
+};
+unsigned char ider_config_feature_0001[] = {
+    0x00, 0x01, /* Feature Code 0001: core */
+    0x03, 0x04, /* Ver=0, Persist=1, Current = 1 Adittional Len = 4 */
+    0x00, 0x00, 0x00, 0x02 /* Feature dependant data = Physical Interface Standard =  00, 00, 00, 02 = ATAPI */
+};
+unsigned char ider_config_feature_0002[] = {
+    0x00, 0x02, //Feature Code 0002h = Morphing
+    0x03, 0x04, // - Ver=0, Persist=1, Current = 1 Adittional Len = 4
+    0x00, 0x00, 0x00, 0x00 // Async = 0
+};
+unsigned char ider_config_feature_0003[] = {
+    0x00, 0x03, //Feature Code - Table 69 - 0003h = Removeable Medium
+    0x03, 0x04, // - Ver=0, Persist=1, Current = 1 Adittional Len = 4
+    0x29, 0x00, 0x00, 0x02, //Feature dependant data = 29 = Loading mechanism type = 1 (Tray), Eject = 1, Lock = 1 (table 78)
+};
+unsigned char ider_config_feature_0010[] = {
+    0x00, 0x10, //Feature Code - Table 69 - 0010h = Random Readable (table 83)
+    0x01, 0x08, // - Ver=0, Persist=0, Current = 1 Adittional Len = 8
+    0x00, 0x00, 0x08, 0x00, //Feature dependant data = Logical block size = 0x00000800
+    0x00, 0x01, //Blocking = 1
+    0x00, 0x00  //PP= 0
+};
+unsigned char ider_config_feature_001e[] = {
+    0x00, 0x1E, //Feature Code - 001Eh = Cd Read
+    0x03, 0x00,  // - Ver=0, Persist=1, Current = 1, Adittional Len = 0
+};
+unsigned char ider_config_feature_0100[] = {
+    0x01, 0x00, //Feature Code - 0100h = Power Management
+    0x03, 0x00  // - Ver=0, Persist=1, Current = 1, Adittional Len = 0
+};
+unsigned char ider_config_feature_0105[] = {
+    0x01, 0x05, //Feature Code - 0105h = Timeout
+    0x03, 0x00  // - Ver=0, Persist=1, Current = 1, Adittional Len = 0
+};
+
 int ider_handle_command(struct redir *r, unsigned int seqno,
 			unsigned char device, bool use_dma,
 			unsigned char *cdb)
@@ -213,7 +253,8 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
     unsigned char resp[512];
     unsigned char *mode_sense = NULL, format;
     uint32_t lba, mode_len;
-    unsigned int count, resp_len = 0;
+    unsigned int count, resp_len = 0, resp_offset;
+    unsigned int start_feature;
 
     if (!r->mmap_size || device != r->device)
 	/* NOT READY, MEDIUM NOT PRESENT */
@@ -356,11 +397,60 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	    return ider_data_to_host(r, device, resp, resp_len, true, use_dma);
 	}
 	break;
-    case 0x46: /* GET CONFIGURATION, missing from scsi.h */
-	fprintf(stderr, "seqno %u: device %02x get configuration (n/i)\n",
-		seqno, device);
-	/* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
-	return ider_packet_sense(r, device, 0x05, 0x20, 0x00);
+    case 0x46: /* GET CONFIGURATION */
+	start_feature = cdb[2];
+	resp_len = (unsigned int)cdb[7] << 8 | cdb[8];
+	fprintf(stderr, "seqno %u: get_configuration start %u len %u\n",
+		seqno, start_feature, resp_len);
+	if (resp_len > sizeof(resp_len))
+	    resp_len = sizeof(resp_len);
+	resp_offset = 6;
+	while (start_feature < 8) {
+	    unsigned char *feature = NULL;
+
+	    switch (start_feature) {
+	    case 0:
+		feature = ider_config_feature_0000;
+		break;
+	    case 1:
+		feature = ider_config_feature_0001;
+		break;
+	    case 2:
+		feature = ider_config_feature_0002;
+		break;
+	    case 3:
+		feature = ider_config_feature_0003;
+		break;
+	    case 4:
+		feature = ider_config_feature_0010;
+		break;
+	    case 5:
+		feature = ider_config_feature_001e;
+		break;
+	    case 6:
+		feature = ider_config_feature_0100;
+		break;
+	    case 7:
+		feature = ider_config_feature_0105;
+		break;
+	    default:
+		break;
+	    }
+	    if (!feature) {
+		/* CHECK CONDITION, INVALID FIELD IN CDB */
+		return ider_packet_sense(r, device, 0x05, 0x24, 0x00);
+	    }
+	    memcpy(resp + resp_offset, feature, feature[3] + 4);
+	    resp_offset += feature[3] + 4;
+	    start_feature++;
+	}
+	resp[0] = (resp_offset >> 24) & 0xff;
+	resp[1] = (resp_offset >> 16) & 0xff;
+	resp[2] = (resp_offset >>  8) & 0xff;
+	resp[3] = resp_offset & 0xff;
+	if (resp_len > resp_offset)
+	    resp_len = resp_offset;
+	return ider_data_to_host(r, device, resp, resp_len, true, use_dma);
     case 0x51: /* READ DISC INFORMATION, missing from scsi.h */
 	format = cdb[1] & 0x7;
 	resp_len = (unsigned int)cdb[7] << 8 | cdb[8];
