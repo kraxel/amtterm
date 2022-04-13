@@ -52,7 +52,7 @@ static int ider_data_to_host(struct redir *r, unsigned char device,
     }
     if (completed) {
 	msg.output.mask = mask | IDER_INTERRUPT_MASK;
-	msg.output.sector_count = IDER_INTERRUPT_CD | IDER_INTERRUPT_CD;
+	msg.output.sector_count = IDER_INTERRUPT_CD | IDER_INTERRUPT_IO;
 	msg.output.drive_select = device;
 	msg.output.status = IDER_STATUS_DRDY | IDER_STATUS_DSC;
     }
@@ -94,17 +94,34 @@ static int ider_packet_sense(struct redir *r,
 static int ider_read_data(struct redir *r, unsigned char device, bool use_dma,
 			  unsigned long lba, unsigned int count)
 {
-    off_t mmap_offset = lba << r->lba_shift;
-    size_t mmap_len = count << r->lba_shift;
+    off_t mmap_offset = (off_t)lba << r->lba_shift;
+    size_t mmap_len = (size_t)count << r->lba_shift;
     unsigned char *lba_ptr =
 	(unsigned char *)r->mmap_buf + mmap_offset;
+    size_t chunk_size = 0x2000;
+    bool last_lba = false;
+    int ret = 0;
 
     if (!count)
 	return ider_packet_sense(r, device, 0x00, 0x00, 0x00);
     if (mmap_offset >= r->mmap_size)
 	return ider_packet_sense(r, device, 0x05, 0x21, 0x00);
 
-    return ider_data_to_host(r, device, lba_ptr, mmap_len, true, use_dma);
+    while (mmap_len) {
+	if (mmap_len <= chunk_size) {
+	    chunk_size = mmap_len;
+	    last_lba = true;
+	}
+	ret = ider_data_to_host(r, device, lba_ptr, chunk_size,
+				last_lba, use_dma);
+	if (ret < 0)
+	    break;
+	if (last_lba)
+	    break;
+	lba_ptr += chunk_size;
+	mmap_len -= chunk_size;
+    }
+    return ret;
 }
 
 unsigned char ider_mode_page_01_floppy[] = {
