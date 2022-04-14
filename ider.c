@@ -208,42 +208,42 @@ unsigned char ider_mode_page_2a_cdrom[] = {
 
 unsigned char ider_config_feature_0000[] = {
     0x00, 0x00, /* Feature Code 0000: profile list */
-    0x03, 0x04, /* Ver=0, Persist=1, Current = 1 Adittional Len = 4 */
+    0x03, 0x04, /* Ver=0, Persist=1, Current = 1 Additional Len = 4 */
     0x00, 0x08, 0x01, 0x00, /* Current profile: 0008 - CD-ROM */
 };
 unsigned char ider_config_feature_0001[] = {
     0x00, 0x01, /* Feature Code 0001: core */
-    0x03, 0x04, /* Ver=0, Persist=1, Current = 1 Adittional Len = 4 */
-    0x00, 0x00, 0x00, 0x02 /* Feature dependant data = Physical Interface Standard =  00, 00, 00, 02 = ATAPI */
+    0x03, 0x04, /* Ver=0, Persist=1, Current = 1 Additional Len = 4 */
+    0x00, 0x00, 0x00, 0x02 /* Physical Interface Standard = ATAPI */
 };
 unsigned char ider_config_feature_0002[] = {
-    0x00, 0x02, //Feature Code 0002h = Morphing
-    0x03, 0x04, // - Ver=0, Persist=1, Current = 1 Adittional Len = 4
-    0x00, 0x00, 0x00, 0x00 // Async = 0
+    0x00, 0x02, /* Feature Code 0002h = Morphing */
+    0x03, 0x04, /* Ver=0, Persist=1, Current = 1 Additional Len = 4 */
+    0x00, 0x00, 0x00, 0x00 /* Async = 0 */
 };
 unsigned char ider_config_feature_0003[] = {
-    0x00, 0x03, //Feature Code - Table 69 - 0003h = Removeable Medium
-    0x03, 0x04, // - Ver=0, Persist=1, Current = 1 Adittional Len = 4
-    0x29, 0x00, 0x00, 0x02, //Feature dependant data = 29 = Loading mechanism type = 1 (Tray), Eject = 1, Lock = 1 (table 78)
+    0x00, 0x03, /* Feature Code 0003h = Removeable Medium */
+    0x03, 0x04, /* Ver=0, Persist=1, Current = 1 Additional Len = 4 */
+    0x29, 0x00, 0x00, 0x02, /* Loading mechanism type = 1 (Tray), Eject = 1, Lock = 1 */
 };
 unsigned char ider_config_feature_0010[] = {
-    0x00, 0x10, //Feature Code - Table 69 - 0010h = Random Readable (table 83)
-    0x01, 0x08, // - Ver=0, Persist=0, Current = 1 Adittional Len = 8
-    0x00, 0x00, 0x08, 0x00, //Feature dependant data = Logical block size = 0x00000800
-    0x00, 0x01, //Blocking = 1
-    0x00, 0x00  //PP= 0
+    0x00, 0x10, /* Feature Code 0010h = Random Readable */
+    0x01, 0x08, /* Ver=0, Persist=0, Current = 1 Additional Len = 8 */
+    0x00, 0x00, 0x08, 0x00, /* Logical block size = 2048 */
+    0x00, 0x01, /* Blocking = 1 */
+    0x00, 0x00  /* Read/Write Error Recovery page = 0 */
 };
 unsigned char ider_config_feature_001e[] = {
-    0x00, 0x1E, //Feature Code - 001Eh = Cd Read
-    0x03, 0x00,  // - Ver=0, Persist=1, Current = 1, Adittional Len = 0
+    0x00, 0x1E, /* Feature Code 001Eh = CD Read */
+    0x03, 0x00, /* Ver=0, Persist=1, Current = 1, Additional Len = 0 */
 };
 unsigned char ider_config_feature_0100[] = {
-    0x01, 0x00, //Feature Code - 0100h = Power Management
-    0x03, 0x00  // - Ver=0, Persist=1, Current = 1, Adittional Len = 0
+    0x01, 0x00, /* Feature Code 0100h = Power Management */
+    0x03, 0x00  /* Ver=0, Persist=1, Current = 1, Additional Len = 0 */
 };
 unsigned char ider_config_feature_0105[] = {
-    0x01, 0x05, //Feature Code - 0105h = Timeout
-    0x03, 0x00  // - Ver=0, Persist=1, Current = 1, Adittional Len = 0
+    0x01, 0x05, /* Feature Code 0105h = Timeout */
+    0x03, 0x00  /* Ver=0, Persist=1, Current = 1, Additional Len = 0 */
 };
 
 int ider_handle_command(struct redir *r, unsigned int seqno,
