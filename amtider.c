@@ -39,13 +39,6 @@
 
 /* ------------------------------------------------------------------ */
 
-static int recv_ider(void *cb_data, unsigned char *buf, int len)
-{
-    struct redir *r = cb_data;
-
-    return write(STDOUT_FILENO, buf, len);
-}
-
 static void state_ider(void *cb_data, enum redir_state old,
 		       enum redir_state new)
 {
@@ -166,15 +159,15 @@ static void usage(FILE *fp)
 	    "This is " APPNAME ", release " VERSION ", it'll establish\n"
 	    "ide-redirection (ider) connections to your Intel AMT boxes.\n"
 	    "\n"
-	    "usage: " APPNAME " [options] host [port]\n"
+	    "usage: " APPNAME " [options] host file\n"
 	    "options:\n"
 	    "   -h            print this text\n"
 	    "   -v            verbose (default)\n"
 	    "   -q            quiet\n"
-	    "   -c            use CD-ROM emulation\n"
+	    "   -c            use CD-ROM emulation (default)\n"
+	    "   -f            use floppy emulation\n"
 	    "   -g            start redirection gracefully\n"
 	    "   -r            start redirection on reboot\n"
-	    "   -f file       file to use as device data\n"
 	    "   -L            use legacy authentication\n"
 #if defined(USE_OPENSSL) || defined(USE_GNUTLS)
 	    "   -C cacert     enable SSL and use PEM cacert file\n"
@@ -203,16 +196,15 @@ int main(int argc, char *argv[])
     strcpy(r.user, "admin");
 
     r.cb_data  = &r;
-    r.cb_recv  = recv_ider;
     r.cb_state = state_ider;
-    r.device = 0xa0;
+    r.device = 0xb0;
     r.enable_options = IDER_START_NOW;
 
     if (NULL != (h = getenv("AMT_PASSWORD")))
 	snprintf(r.pass, sizeof(r.pass), "%s", h);
 
     for (;;) {
-	if (-1 == (c = getopt(argc, argv, "cdf:ghvqu:p:LC:")))
+	if (-1 == (c = getopt(argc, argv, "cdfghvqu:p:LC:")))
 	    break;
 	switch (c) {
 	case 'v':
@@ -222,7 +214,7 @@ int main(int argc, char *argv[])
 	    r.verbose = 0;
 	    break;
 	case 'f':
-	    snprintf(r.filename, sizeof(r.filename), "%s", optarg);
+	    r.device = 0xa0;
 	    break;
 	case 'u':
 	    snprintf(r.user, sizeof(r.user), "%s", optarg);
@@ -259,11 +251,19 @@ int main(int argc, char *argv[])
     }
 
     if (optind < argc) {
+	char *port;
+
 	snprintf(r.host, sizeof(r.host), "%s", argv[optind]);
+	port = strrchr(r.host, ':');
+	if (port) {
+	    *port = '\0';
+	    port++;
+	    snprintf(r.port, sizeof(r.port), "%s", port);
+	}
 	optind++;
     }
     if (optind < argc) {
-	snprintf(r.port, sizeof(r.port), "%s", argv[optind]);
+	snprintf(r.filename, sizeof(r.filename), "%s", argv[optind]);
 	optind++;
     }
     if (0 == strlen(r.host)) {

@@ -1,0 +1,61 @@
+.TH amtider 1 "(c) 2022 Hannes Reinecke"
+.SH NAME
+amtider - Intel AMT IDE redirection (ider) client.
+.SH SYNOPSIS
+.B amtider [ options ] host[:port] file
+.SH DESCRIPTION
+.B amtider
+provides a virtual floppy or CD-ROM for Intel AMT managed machines.
+.B host
+is the hostname or IP address of the machine amtider should connect
+to.
+.B port
+is the tcp port to use and defaults to 16994 (standard AMT redirection
+port) if unspecified.
+.B file
+is the filename of the image to be used for floppy or CD-ROM emulation.
+.P
+For more information on Intel AMT check amt-howto(7).
+.SH OPTIONS
+.TP
+.B -h
+Display help text.
+.TP
+.B -v
+Be verbose (default).
+.TP
+.B -q
+Be quiet.
+.TP
+.B -u <user>
+Specify username, defaults to "admin".
+.TP
+.B -p <pass>
+Specify password.
+.B amtterm
+will prompt on the terminal if unspecified.
+.TP
+.B -c
+Use CD-ROM emulation (this is the default).
+.TP
+.B -f
+Use Floppy emulation
+.TP
+.B -g
+Start redirection gracefully.
+.TP
+.B -r
+Start redirection on reboot.
+.SH ENVIRONMENT
+.TP
+.B AMT_PASSWORD
+Default value for the password.
+.SH NOTE
+Newer AMT machines have the SoL port disabled by default, it can be
+enabled remotely using:
+"wsman put http://intel.com/wbem/wscim/1/amt-schema/1/AMT_RedirectionService
+-h ${AMT_HOST} -P 16992 -u admin -p ${AMT_PASSWORD} -k ListenerEnabled=true"
+.SH SEE ALSO
+gamt(1), amttool(1), amtterm(1), amt-howto(7)
+.SH AUTHOR
+(c) 2022 Hannes Reinecke <hare@suse.de>
