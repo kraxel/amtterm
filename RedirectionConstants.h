@@ -102,6 +102,10 @@
 #define IDER_START_GRACEFUL                 0x10
 #define IDER_START_NOW                      0x18
 
+/* IDER device types */
+#define IDER_DEVICE_FLOPPY                  0xa0
+#define IDER_DEVICE_CDROM                   0xb0
+
 #define START_IDER_REDIRECTION_LENGTH                 18
 #define START_IDER_REDIRECTION_REPLY_LENGTH           30 //TODO: There is a OEM Defined data field that we are assuming to be 0 bytes..
 #define END_IDER_REDIRECTION_LENGTH                   8

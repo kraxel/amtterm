@@ -447,7 +447,8 @@ static int redir_ider_command(struct redir *r, unsigned int seqno)
 {
     struct ider_command_written_message *msg =
 	(struct ider_command_written_message *)r->buf;
-    unsigned char device = msg->drive_select & 0x10 ? 0xb0 : 0xa0;
+    unsigned char device = msg->drive_select & 0x10 ?
+	IDER_DEVICE_CDROM : IDER_DEVICE_FLOPPY;
     bool use_dma = msg->feature & 1;
     int i;
 

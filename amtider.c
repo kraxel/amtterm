@@ -197,7 +197,7 @@ int main(int argc, char *argv[])
 
     r.cb_data  = &r;
     r.cb_state = state_ider;
-    r.device = 0xb0;
+    r.device = IDER_DEVICE_CDROM;
     r.enable_options = IDER_START_NOW;
 
     if (NULL != (h = getenv("AMT_PASSWORD")))
@@ -214,13 +214,13 @@ int main(int argc, char *argv[])
 	    r.verbose = 0;
 	    break;
 	case 'f':
-	    r.device = 0xa0;
+	    r.device = IDER_DEVICE_FLOPPY;
 	    break;
 	case 'u':
 	    snprintf(r.user, sizeof(r.user), "%s", optarg);
 	    break;
 	case 'c':
-	    r.device = 0xb0;
+	    r.device = IDER_DEVICE_CDROM;
 	    break;
 	case 'g':
 	    r.enable_options = IDER_START_GRACEFUL;
@@ -293,7 +293,7 @@ int main(int argc, char *argv[])
 	perror("mmap");
 	exit(1);
     }
-    if (r.device == 0xa0) {
+    if (r.device == IDER_DEVICE_FLOPPY) {
 	r.lba_size = 512;
 	r.lba_shift = 9;
     } else {

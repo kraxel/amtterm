@@ -89,7 +89,7 @@ static int ider_packet_sense(struct redir *r,
 	msg.asq = asq;
     }
     return redir_write(r, (const char *)&msg, sizeof(msg));
-}    
+}
 
 static int ider_read_data(struct redir *r, unsigned char device, bool use_dma,
 			  unsigned long lba, unsigned int count)
@@ -286,7 +286,7 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 		seqno, cdb[2], mode_len);
 	switch (cdb[2] & 0x3f) {
 	case 0x01:
-	    if (device == 0xa0) {
+	    if (device == IDER_DEVICE_FLOPPY) {
 		if (lba < 0xb40)
 		    mode_sense = ider_mode_page_01_floppy;
 		else
@@ -295,7 +295,7 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 		mode_sense = ider_mode_page_01_cdrom;
 	    break;
 	case 0x05:
-	    if (device == 0xa0) {
+	    if (device == IDER_DEVICE_FLOPPY) {
 		if (lba < 0xb40)
 		    mode_sense = ider_mode_page_05_floppy;
 		else
@@ -303,7 +303,7 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 	    }
 	    break;
 	case 0x3f:
-	    if (device == 0xa0) {
+	    if (device == IDER_DEVICE_FLOPPY) {
 		if (lba < 0xb40)
 		    mode_sense = ider_mode_page_3f_floppy;
 		else
@@ -312,15 +312,15 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 		mode_sense = ider_mode_page_3f_cdrom;
 	    break;
 	case 0x1a:
-	    if (device == 0xb0)
+	    if (device == IDER_DEVICE_CDROM)
 		mode_sense = ider_mode_page_1a_cdrom;
 	    break;
 	case 0x1d:
-	    if (device == 0xb0)
+	    if (device == IDER_DEVICE_CDROM)
 		mode_sense = ider_mode_page_1d_cdrom;
 	    break;
 	case 0x2a:
-	    if (device == 0xb0)
+	    if (device == IDER_DEVICE_CDROM)
 		mode_sense = ider_mode_page_2a_cdrom;
 	    break;
 	}
@@ -343,7 +343,7 @@ int ider_handle_command(struct redir *r, unsigned int seqno,
 		seqno, lba, r->lba_size);
 	return ider_data_to_host(r, device, resp, 8, true, use_dma);
     case READ_TOC:
-	if (device == 0xa0) {
+	if (device == IDER_DEVICE_FLOPPY) {
 	    /* ILLEGAL REQUEST, INVALID COMMAND OPERATION CODE */
 	    return ider_packet_sense(r, device, 0x05, 0x20, 0x00);
 	} else {
