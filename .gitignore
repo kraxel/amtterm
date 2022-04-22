@@ -1,3 +1,6 @@
 Make.config
 *.o
 *.dep
+amtider
+amtterm
+gamt
