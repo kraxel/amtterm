@@ -15,7 +15,7 @@ sync:: distclean
 repository  := $(shell basename $(PWD))
 usetito     := $(shell if test -d .tito; then echo yes; else echo no; fi)
 release-dir ?= $(HOME)/projects/Releases
-release-pub ?= bigendian.kraxel.org:/public/vhosts/www.kraxel.org/releases/$(repository)
+release-pub ?= hagrid.kraxel.org:/public/vhosts/www.kraxel.org/releases/$(repository)
 tarball      = $(release-dir)/$(repository)-$(VERSION).tar
 
 ifeq ($(usetito),yes)
