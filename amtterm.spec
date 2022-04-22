@@ -13,6 +13,7 @@ BuildRequires: desktop-file-utils
 BuildRequires: pkgconfig(gtk+-3.0)
 BuildRequires: pkgconfig(gdk-3.0)
 BuildRequires: pkgconfig(vte-2.91)
+BuildRequires: pkgconfig(gnutls)
 
 %description
 Serial-over-lan (sol) client for Intel AMT.
@@ -25,10 +26,10 @@ about and remotely control AMT managed computers.
 
 %build
 export CFLAGS="%{optflags}"
-make prefix=/usr
+make USE_GNUTLS=1 prefix=/usr
 
 %install
-make prefix=/usr DESTDIR=%{buildroot} STRIP="" install
+make USE_GNUTLS=1 prefix=/usr DESTDIR=%{buildroot} STRIP="" install
 desktop-file-install --dir=%{buildroot}%{_datadir}/applications/ \
     %{buildroot}/%{_datadir}/applications/gamt.desktop
 
