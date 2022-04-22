@@ -35,9 +35,11 @@ desktop-file-install --dir=%{buildroot}%{_datadir}/applications/ \
 %files
 %doc COPYING
 %{_bindir}/amtterm
+%{_bindir}/amtider
 %{_bindir}/amttool
 %{_bindir}/gamt
 %{_mandir}/man1/amtterm.1.gz
+%{_mandir}/man1/amtider.1.gz
 %{_mandir}/man1/amttool.1.gz
 %{_mandir}/man1/gamt.1.gz
 %{_mandir}/man7/amt-howto.7.gz
