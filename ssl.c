@@ -76,7 +76,7 @@ struct ctx *sslinit(int fd,char *cacert)
 	SSL_load_error_strings();
 	SSL_library_init();
 
-	if(!(ctx->ctx=SSL_CTX_new(SSLv23_client_method())))
+       if(!(ctx->ctx=SSL_CTX_new(TLSv1_2_client_method())))
 	{
 		ERR_print_errors_fp(stderr);
 		goto err1;
@@ -84,7 +84,7 @@ struct ctx *sslinit(int fd,char *cacert)
 
 #if OPENSSL_VERSION_NUMBER >= 0x1000100FL
 	SSL_CTX_set_options(ctx->ctx,
-		SSL_OP_NO_TLSv1_1|SSL_OP_NO_TLSv1_2);
+               SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION);
 #endif
 
 	if(!SSL_CTX_load_verify_locations(ctx->ctx,cacert,NULL))
