@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use SOAP::Lite;
 #use SOAP::Lite +trace => 'all';
+use IO::Socket::SSL;
 
 my $amt_host = shift;
 my $amt_port = "16992";
@@ -100,6 +101,16 @@ my %pt_status = (
 # soap setup
 
 my ($nas, $sas, $rcs);
+
+IO::Socket::SSL::set_defaults(
+    SSL_create_ctx_callback => sub {
+        my $ctx = shift;
+        # SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION
+        Net::SSLeay::CTX_set_options($ctx, 0x00040000);
+        # Set SSL_verify_mode to SSL_VERIFY_NONE (do not verify the certificate)
+        Net::SSLeay::CTX_set_verify($ctx, Net::SSLeay::VERIFY_NONE, sub { 1 });
+    },
+);
 
 sub SOAP::Transport::HTTP::Client::get_basic_credentials {
 	return $main::amt_user => $main::amt_pass;
