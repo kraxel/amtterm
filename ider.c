@@ -23,8 +23,16 @@
 #include <string.h>
 #include <stdbool.h>
 #include <sys/types.h>
-#include <scsi/scsi.h>
 #include "redir.h"
+
+/* SCSI opcodes */
+#define TEST_UNIT_READY		0x00
+#define MODE_SENSE		0x1a
+#define ALLOW_MEDIUM_REMOVAL	0x1e
+#define READ_CAPACITY		0x25
+#define READ_10			0x28
+#define READ_TOC		0x43
+#define MODE_SENSE_10		0x5a
 
 static int ider_data_to_host(struct redir *r, unsigned char device,
 			     unsigned char *data, unsigned int data_len,
