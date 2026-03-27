@@ -412,7 +412,7 @@ int redir_ider_config(struct redir *r)
 {
     unsigned char request[IDER_DISABLE_ENABLE_FEATURES_LENGTH] = {
 	IDER_DISABLE_ENABLE_FEATURES, 0, 0, 0,
-	r->seqno & 0xff, (r->seqno >> 8) && 0xff,
+	r->seqno & 0xff, (r->seqno >> 8) & 0xff,
 	(r->seqno >> 16) & 0xff, (r->seqno >> 24) & 0xff,
 	IDER_FEATURE_SET_REGISTER_STATE,
 	IDER_FEATURE_ENABLE | r->enable_options, 0, 0, 0
