@@ -7,8 +7,7 @@ build-fedora:
   before_script:
     - dnf builddep -y *.spec
   script:
-    - meson setup build-ci
-    - ninja-build -C build-ci
+    - make
 
 build-tito-rpm:
   stage: build
