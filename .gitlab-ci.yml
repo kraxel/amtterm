@@ -1,15 +1,6 @@
 stages:
   - build
 
-build-make:
-  stage: build
-  image: registry.fedoraproject.org/fedora:latest
-  when: manual
-  before_script:
-    - dnf builddep -y *.spec
-  script:
-    - make
-
 build-meson:
   stage: build
   image: registry.fedoraproject.org/fedora:latest
