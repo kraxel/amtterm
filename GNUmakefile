@@ -58,11 +58,11 @@ install: build
 	$(INSTALL_BINARY) $(TARGETS) $(bindir)
 	$(INSTALL_SCRIPT) amttool $(bindir)
 	$(INSTALL_DATA) $(DESKTOP) $(appdir)
-	$(INSTALL_DATA) gamt.man $(mandir)/man1/gamt.1
-	$(INSTALL_DATA) amtterm.man $(mandir)/man1/amtterm.1
-	$(INSTALL_DATA) amtider.man $(mandir)/man1/amtider.1
-	$(INSTALL_DATA) amttool.man $(mandir)/man1/amttool.1
-	$(INSTALL_DATA) amt-howto.man $(mandir)/man7/amt-howto.7
+	$(INSTALL_DATA) gamt.1 $(mandir)/man1/gamt.1
+	$(INSTALL_DATA) amtterm.1 $(mandir)/man1/amtterm.1
+	$(INSTALL_DATA) amtider.1 $(mandir)/man1/amtider.1
+	$(INSTALL_DATA) amttool.1 $(mandir)/man1/amttool.1
+	$(INSTALL_DATA) amt-howto.7 $(mandir)/man7/amt-howto.7
 
 clean:
 	rm -f *.o *~
