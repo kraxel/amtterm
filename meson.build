@@ -50,4 +50,6 @@ if gtk_dep.found() and vte_dep.found()
                dependencies : [ gtk_dep, vte_dep, ssl_dep ],
                install      : true)
     install_man('gamt.1')
+    install_data('gamt.desktop',
+                 install_dir  : 'share/applications')
 endif

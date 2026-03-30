@@ -32,8 +32,7 @@ ninja-build -C build-rpm
 %install
 export DESTDIR=%{buildroot}
 ninja-build -C build-rpm install
-desktop-file-install --dir=%{buildroot}%{_datadir}/applications/ \
-    %{buildroot}/%{_datadir}/applications/gamt.desktop
+mkdir -p %{buildroot}%{_datadir}/applications
 
 %files
 %doc COPYING
