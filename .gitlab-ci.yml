@@ -4,6 +4,7 @@ stages:
 build-make:
   stage: build
   image: registry.fedoraproject.org/fedora:latest
+  when: manual
   before_script:
     - dnf builddep -y *.spec
   script:
@@ -13,7 +14,6 @@ build-meson:
   stage: build
   image: registry.fedoraproject.org/fedora:latest
   before_script:
-    - dnf install -y meson
     - dnf builddep -y *.spec
   script:
     - meson setup build-ci
