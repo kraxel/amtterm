@@ -1,13 +1,23 @@
 stages:
   - build
 
-build-fedora:
+build-make:
   stage: build
   image: registry.fedoraproject.org/fedora:latest
   before_script:
     - dnf builddep -y *.spec
   script:
     - make
+
+build-meson:
+  stage: build
+  image: registry.fedoraproject.org/fedora:latest
+  before_script:
+    - dnf install -y meson
+    - dnf builddep -y *.spec
+  script:
+    - meson setup build-ci
+    - ninja-build -C build-ci
 
 build-tito-rpm:
   stage: build
