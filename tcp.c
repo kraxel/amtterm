@@ -38,9 +38,9 @@ int tcp_verbose;
 static char *strfamily(int family)
 {
     switch (family) {
-    case PF_INET6: return "ipv6";
-    case PF_INET:  return "ipv4";
-    case PF_UNIX:  return "unix";
+    case AF_INET6: return "ipv6";
+    case AF_INET:  return "ipv4";
+    case AF_UNIX:  return "unix";
     }
     return "????";
 }

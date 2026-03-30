@@ -29,7 +29,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
-#include <sys/signalfd.h>
 #include <sys/mman.h>
 #include <sys/select.h>
 
@@ -64,6 +63,63 @@ static void state_ider(void *cb_data, enum redir_state old,
     }
 }
 
+#ifdef HAVE_SIGNALFD
+
+#include <sys/signalfd.h>
+
+static int get_eventfd(sigset_t mask)
+{
+	int sfd = signalfd(-1, &mask, 0);
+
+	if (sfd < 0) {
+		perror("signalfd");
+		exit(1);
+	}
+
+	return sfd;
+}
+
+#elif defined(HAVE_KQUEUE)
+
+#include <sys/types.h>
+#include <sys/event.h>
+#include <sys/time.h>
+
+static int get_eventfd(sigset_t mask)
+{
+	int kq = kqueue();
+	struct kevent sigevt;
+	sigset_t empty;
+	unsigned int i;
+
+	if (kq < 0) {
+		perror("kqueue");
+		exit(1);
+	}
+
+	sigemptyset(&empty);
+	/* Drain the sigset. */
+	for (i = 0; mask != empty; i++) {
+		if (!sigismember(&mask, i))
+			continue;
+
+		sigdelset(&mask, i);
+		EV_SET(&sigevt, i, EVFILT_SIGNAL, EV_ADD | EV_ENABLE, 0, 0, NULL);
+		kevent(kq, &sigevt, 1, NULL, 0, NULL);
+	}
+
+	return kq;
+}
+
+#else
+
+static int get_eventfd(sigset_t mask)
+{
+	return -1;
+}
+
+#endif
+
 static int redir_loop(struct redir *r)
 {
     struct timeval tv;
@@ -76,16 +132,11 @@ static int redir_loop(struct redir *r)
     sigaddset(&mask, SIGINT);
     sigaddset(&mask, SIGQUIT);
 
-    if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1) {
+    sfd = get_eventfd(mask);
+    if (sfd > 0 && sigprocmask(SIG_BLOCK, &mask, NULL) == -1) {
 	perror("sigprocmask");
 	exit(1);
     }
-    sfd = signalfd(-1, &mask, 0);
-    if (sfd < 0) {
-	perror("signalfd");
-	exit(1);
-    }
-
 
     for(;;) {
 	if (r->state == REDIR_CLOSED ||

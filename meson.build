@@ -12,13 +12,21 @@ config.set_quoted('VERSION', version.stdout().strip())
 
 # pkg-config deps
 glib_dep = dependency('glib-2.0', method: 'pkg-config')
-gtk_dep  = dependency('gtk+-3.0', method: 'pkg-config')
-gdk_dep  = dependency('gdk-3.0',  method: 'pkg-config')
-vte_dep  = dependency('vte-2.91', method: 'pkg-config')
+gtk_dep  = dependency('gtk+-3.0', method: 'pkg-config', required : false)
+gdk_dep  = dependency('gdk-3.0',  method: 'pkg-config', required : false)
+vte_dep  = dependency('vte-2.91', method: 'pkg-config', required : false)
 
 # use gnutls
 ssl_dep  = dependency('gnutls',   method: 'pkg-config')
 config.set('USE_GNUTLS', true)
+
+# detect signalfd and kqueue
+cc = meson.get_compiler('c')
+if cc.has_header_symbol('sys/signalfd.h', 'signalfd')
+    add_project_arguments('-DHAVE_SIGNALFD', language: 'c')
+elif cc.has_header_symbol('sys/event.h', 'kqueue')
+    add_project_arguments('-DHAVE_KQUEUE', language: 'c')
+endif
 
 # config, finalize
 configure_file(output : 'config.h', configuration : config)
@@ -44,10 +52,10 @@ install_man('amtider.1')
 install_man('amttool.1')
 install_man('amt-howto.7')
 
-if gtk_dep.found() and vte_dep.found()
+if gtk_dep.found() and vte_dep.found() and gtk_dep.found()
     executable('gamt',
                sources      : [ 'gamt.c', 'parseconfig.c', common_src ],
-               dependencies : [ gtk_dep, vte_dep, ssl_dep ],
+               dependencies : [ gtk_dep, vte_dep, ssl_dep, gdk_dep ],
                install      : true)
     install_man('gamt.1')
     install_data('gamt.desktop',
