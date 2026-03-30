@@ -8,7 +8,7 @@ URL:          http://www.kraxel.org/blog/linux/amtterm/
 Source:       http://www.kraxel.org/releases/%{name}/%{name}-%{version}.tar.gz
 Requires:     xdg-utils
 
-BuildRequires: gcc
+BuildRequires: meson gcc
 BuildRequires: desktop-file-utils
 BuildRequires: pkgconfig(gtk+-3.0)
 BuildRequires: pkgconfig(gdk-3.0)
@@ -26,10 +26,12 @@ about and remotely control AMT managed computers.
 
 %build
 export CFLAGS="%{optflags}"
-make USE_GNUTLS=1 prefix=/usr
+meson --prefix=%{_prefix} build-rpm
+ninja-build -C build-rpm
 
 %install
-make USE_GNUTLS=1 prefix=/usr DESTDIR=%{buildroot} STRIP="" install
+export DESTDIR=%{buildroot}
+ninja-build -C build-rpm install
 desktop-file-install --dir=%{buildroot}%{_datadir}/applications/ \
     %{buildroot}/%{_datadir}/applications/gamt.desktop
 
