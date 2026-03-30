@@ -20,6 +20,14 @@ vte_dep  = dependency('vte-2.91', method: 'pkg-config', required : false)
 ssl_dep  = dependency('gnutls',   method: 'pkg-config')
 config.set('USE_GNUTLS', true)
 
+# detect signalfd and kqueue
+cc = meson.get_compiler('c')
+if cc.has_header_symbol('sys/signalfd.h', 'signalfd')
+    add_project_arguments('-DHAVE_SIGNALFD', language: 'c')
+elif cc.has_header_symbol('sys/event.h', 'kqueue')
+    add_project_arguments('-DHAVE_KQUEUE', language: 'c')
+endif
+
 # config, finalize
 configure_file(output : 'config.h', configuration : config)
 add_global_arguments(['-include', 'config.h'], language : 'c')
