@@ -31,6 +31,7 @@
 #include <sys/ioctl.h>
 #include <sys/signalfd.h>
 #include <sys/mman.h>
+#include <sys/select.h>
 
 #include "redir.h"
 

@@ -27,6 +27,7 @@
 #include <termios.h>
 #include <signal.h>
 #include <sys/ioctl.h>
+#include <sys/select.h>
 
 #include "redir.h"
 
