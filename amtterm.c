@@ -182,13 +182,14 @@ static void usage(FILE *fp)
 	    "   -q            quiet\n"
 	    "   -L            use legacy authentication\n"
 #if defined(USE_OPENSSL) || defined(USE_GNUTLS)
+	    "   -P            use legacy non-SSL conection\n"
 	    "   -C cacert     enable SSL and use PEM cacert file\n"
 #endif
 	    "   -u user       username (default: admin)\n"
 	    "   -p pass       password (default: $AMT_PASSWORD)\n"
 	    "\n"
 #if defined(USE_OPENSSL) || defined(USE_GNUTLS)
-	    "By default port 16994 (SSL: 16995) is used.\n"
+	    "By default port 16995 (non-SSL: 16994) is used.\n"
 #else
 	    "By default port 16994 is used.\n"
 #endif
@@ -213,12 +214,16 @@ int main(int argc, char *argv[])
     r.cb_data  = &r;
     r.cb_recv  = recv_tty;
     r.cb_state = state_tty;
+#if defined(USE_OPENSSL) || defined(USE_GNUTLS)
+    r.ssl = true;
+#endif
+
 
     if (NULL != (h = getenv("AMT_PASSWORD")))
 	snprintf(r.pass, sizeof(r.pass), "%s", h);
 
     for (;;) {
-	if (-1 == (c = getopt(argc, argv, "hvqu:p:LC:")))
+	if (-1 == (c = getopt(argc, argv, "hvqu:p:LC:P")))
 	    break;
 	switch (c) {
 	case 'v':
@@ -238,6 +243,9 @@ int main(int argc, char *argv[])
 	    r.legacy = 1;
 	    break;
 #if defined(USE_OPENSSL) || defined(USE_GNUTLS)
+	case 'P':
+	    r.ssl = false;
+	    break;
 	case 'C':
 	    r.cacert = optarg;
 	    break;

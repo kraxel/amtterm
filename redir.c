@@ -151,7 +151,7 @@ int redir_connect(struct redir *r)
     static unsigned char *sslport = "16995";
     struct addrinfo ai;
 
-    if (r->cacert)
+    if (r->ssl)
 	defport = sslport;
     memset(&ai, 0, sizeof(ai));
     ai.ai_socktype = SOCK_STREAM;
@@ -160,7 +160,8 @@ int redir_connect(struct redir *r)
     redir_state(r, REDIR_CONNECT);
     r->sock = tcp_connect(&ai, NULL, NULL, r->host,
 			  strlen(r->port) ? r->port : defport);
-    r->ctx = sslinit(r->sock, r->cacert);
+    if (r->ssl)
+	r->ctx = sslinit(r->sock, r->cacert);
     if(r->ctx == NULL) {
 	close(r->sock);
 	r->sock = -1;

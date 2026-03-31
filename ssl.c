@@ -71,8 +71,6 @@ struct ctx *sslinit(int fd,char *cacert)
 
 	if(!(ctx=newctx(fd)))return NULL;
 
-	if(!cacert)return ctx;
-
 	SSL_load_error_strings();
 	SSL_library_init();
 
@@ -87,14 +85,17 @@ struct ctx *sslinit(int fd,char *cacert)
                SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION);
 #endif
 
-	if(!SSL_CTX_load_verify_locations(ctx->ctx,cacert,NULL))
+	if(cacert)
 	{
-		ERR_print_errors_fp(stderr);
-		goto err2;
-	}
+		if(!SSL_CTX_load_verify_locations(ctx->ctx,cacert,NULL))
+		{
+			ERR_print_errors_fp(stderr);
+			goto err2;
+		}
 
-	SSL_CTX_set_verify_depth(ctx->ctx,5);
-	SSL_CTX_set_verify(ctx->ctx,SSL_VERIFY_PEER,NULL);
+		SSL_CTX_set_verify_depth(ctx->ctx,5);
+		SSL_CTX_set_verify(ctx->ctx,SSL_VERIFY_PEER,NULL);
+	}
 
 	if(!(ctx->ssl=SSL_new(ctx->ctx)))
 	{
@@ -247,6 +248,11 @@ static int vrycb(gnutls_session_t ssl)
 	return 0;
 }
 
+static int dummy_vrycb(gnutls_session_t ssl)
+{
+	return 0;
+}
+
 struct ctx *sslinit(int fd,char *cacert)
 {
 	int r;
@@ -254,8 +260,6 @@ struct ctx *sslinit(int fd,char *cacert)
 	struct ctx *ctx;
 
 	if(!(ctx=newctx(fd)))return NULL;
-
-	if(!cacert)return ctx;
 
 	if((r=gnutls_global_init()))
 	{
@@ -270,15 +274,23 @@ struct ctx *sslinit(int fd,char *cacert)
 		goto err2;
 	}
 
-	if((r=gnutls_certificate_set_x509_trust_file(ctx->cred,cacert,
-		GNUTLS_X509_FMT_PEM))<0)
+	if(cacert)
 	{
-		fprintf(stderr,"gnutls_certificate_set_x509_trust_file: "
-			"%s\n",gnutls_strerror(r));
-		goto err3;
-	}
 
-	gnutls_certificate_set_verify_function(ctx->cred,vrycb);
+		if((r=gnutls_certificate_set_x509_trust_file(ctx->cred,cacert,
+			GNUTLS_X509_FMT_PEM))<0)
+		{
+			fprintf(stderr,
+				"gnutls_certificate_set_x509_trust_file: "
+				"%s\n",gnutls_strerror(r));
+			goto err3;
+		}
+
+		gnutls_certificate_set_verify_function(ctx->cred,vrycb);
+	}
+	else
+		gnutls_certificate_set_verify_function(ctx->cred, dummy_vrycb);
+
 
 	if((r=gnutls_init(&ctx->ssl,GNUTLS_CLIENT)))
 	{
