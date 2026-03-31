@@ -46,8 +46,8 @@ static char *strfamily(int family)
 }
 
 int tcp_connect(struct addrinfo *ai,
-		char *addr, char *port,
-		char *host, char *serv)
+		const char *addr, const char *port,
+		const char *host, const char *serv)
 {
     struct addrinfo *res,*e;
     struct addrinfo *lres, ask;
@@ -126,7 +126,7 @@ int tcp_connect(struct addrinfo *ai,
     return -1;
 }
 
-int tcp_listen(struct addrinfo *ai, char *addr, char *port)
+int tcp_listen(struct addrinfo *ai, const char *addr, const char *port)
 {
     struct addrinfo *res,*e;
     char uaddr[INET6_ADDRSTRLEN+1];
