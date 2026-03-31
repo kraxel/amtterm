@@ -287,7 +287,7 @@ struct ctx *sslinit(int fd,char *cacert)
 	}
 
 	/* oh well, isn't _that_ easy ?!? :-(  ... compare to openssl ... */
-	if((r=gnutls_priority_set_direct(ctx->ssl,"NONE:+AES-256-CBC:"
+	if((r=gnutls_priority_set_direct(ctx->ssl,"NORMAL:+AES-256-CBC:"
 		"+AES-128-CBC:+3DES-CBC:+COMP-NULL:+CTYPE-X509:+VERS-SSL3.0:"
 		"+SHA256:+SHA1:+RSA:%UNSAFE_RENEGOTIATION",&e)))
 	{
