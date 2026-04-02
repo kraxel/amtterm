@@ -50,6 +50,7 @@ struct redir {
     unsigned int      blen;
     unsigned int      seqno;
 
+    bool              ssl;
     void              *cacert;
     void              *ctx;
 

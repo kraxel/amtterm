@@ -10,8 +10,8 @@ provides a virtual floppy or CD-ROM for Intel AMT managed machines.
 is the hostname or IP address of the machine amtider should connect
 to.
 .B port
-is the tcp port to use and defaults to 16994 (standard AMT redirection
-port) if unspecified.
+is the tcp port to use and defaults to 16995 (standard SSL AMT
+redirection port) if unspecified.
 .B file
 is the filename of the image to be used for floppy or CD-ROM emulation.
 .P
@@ -26,6 +26,15 @@ Be verbose (default).
 .TP
 .B -q
 Be quiet.
+.TP
+.B -P
+Use legacy non-SSL connection.
+.TP
+.B -C <cacert>
+Authenticate the server side with the PEM certificate.
+.TP
+.B -L
+Use legacy authentication
 .TP
 .B -u <user>
 Specify username, defaults to "admin".

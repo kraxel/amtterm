@@ -5,7 +5,7 @@
 extern int tcp_verbose;
 
 int tcp_connect(struct addrinfo *ai,
-		char *addr, char *port,
-		char *host, char *serv);
+		const char *addr, const char *port,
+		const char *host, const char *serv);
 
-int tcp_listen(struct addrinfo *ai, char *addr, char *port);
+int tcp_listen(struct addrinfo *ai, const char *addr, const char *port);

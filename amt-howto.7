@@ -56,9 +56,17 @@ greeting page with a button for login.
 You can login now, using "admin" as username and the password
 configured during setup.  You'll see some pages with informations
 about the machine.  You can also change AMT settings here.
+.P
+The server side certificate can be fetched using:
+.nf
+   openssl s_client -connect machine:16993 < /dev/null 2> /dev/null | openssl x509 > myhost.cert
+.fi
+.P
+This command will generate a PEM certificate suitable to be used with
+the -C option.
 
 .SS Control Machine
-You might have noticed already while browing the pages: There is a
+You might have noticed already while browsing the pages: There is a
 "Remote Control" page.  You can remotely reset and powercycle the
 machine there, thus recover the machine after booting a b0rken kernel,
 without having someone walk over to the machine and hit the reset
@@ -97,16 +105,18 @@ that you need "\-\-port=0xe000" instead of "\-\-unit=0" due to the
 non-standard I/O port for the serial line (my machine, yours might use
 another port, check linux kernel boot messages).
 .P
-The magic command for the Xen kernel is "com1=115200,8n1,0xe000,0"
-(again, you might have to replace the I/O port).  The final '0'
-disables the IRQ, otherwise the Xen kernel hangs at boot after
-enabling interrupts.
+The magic command for the Xen kernel is "com1=115200,8n1,amt,0"
+You can also put the IO port address in place of amt, but amt should
+find the PCI device itself and make sure the BAR is enabled.  The
+final '0' disables the IRQ, otherwise the Xen kernel hangs at boot
+after enabling interrupts.
 
 .SS Fun with Xen and AMT
 The AMT network stack seems to become slightly confused when running
 on a Xen host in DHCP mode.  Everything works fine as long as only
 Dom0 runs.  But if one starts a guest OS (with bridged networking) AMT
-suddenly changes the IP address to the one the guest aquired via DHCP.
+suddenly changes the IP address to the one the guest acquired via
+DHCP.
 .P
 It is probably a good idea to assign a separate static IP address to
 AMT then.  I didn't manage to switch my machine from DHCP to static IP
