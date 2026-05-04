@@ -1,6 +1,6 @@
 Name:         amtterm
 License:      GPLv2+
-Version:      1.7
+Version:      1.8
 Release:      1%{?dist}
 Summary:      Serial-over-lan (sol) client for Intel AMT
 Group:        Applications/Internet
@@ -48,6 +48,33 @@ mkdir -p %{buildroot}%{_datadir}/applications
 %{_datadir}/applications/gamt.desktop
 
 %changelog
+* Mon May 04 2026 Gerd Hoffmann <kraxel@redhat.com> 1.8-1
+- mapages: document new options (roger.pau@citrix.com)
+- ssl: use SSL by default without server certificate checking
+  (roger.pau@citrix.com)
+- tcp: constify some of the function parameters (roger.pau@citrix.com)
+- ssl: widen GnuTLS priority string (roger.pau@citrix.com)
+- purge make buildsystem (kraxel@redhat.com)
+- amtider: allow to build without signalfd (roger.pau@citrix.com)
+- tcp: use POSIX defines for family types (roger.pau@citrix.com)
+- meson: make gtk, gdk and vte optional dependencies (roger.pau@citrix.com)
+- ci: downgrade make test to manual (kraxel@redhat.com)
+- move .desktop install from rpm spec to meson.build (kraxel@redhat.com)
+- switch rpm build to meson (kraxel@redhat.com)
+- add meson.build (kraxel@redhat.com)
+- rename manual pages (kraxel@redhat.com)
+- add missing include files (kraxel@redhat.com)
+- ider: remove dependency on Linux specific scsi/scsi.h header
+  (roger.pau@citrix.com)
+- redir: remove extra '&' in mask (roger.pau@citrix.com)
+- ci: meson -> make (not converted yet) (kraxel@redhat.com)
+- ci: drop include (kraxel@redhat.com)
+- amttool: set SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION (flokli@flokli.de)
+- enable TLSv1.2 support with legacy renegotiation (dmitry@bedrocksystems.com)
+- update upload host (kraxel@redhat.com)
+- enable ssl in rpm builds (kraxel@redhat.com)
+- update gitignore, add gitlab ci (kraxel@redhat.com)
+
 * Fri Apr 22 2022 Gerd Hoffmann <kraxel@redhat.com> 1.7-1
 - add amtider to specfile (kraxel@redhat.com)
 - amtider: use defines for floppy and cdrom type (hare@suse.de)
